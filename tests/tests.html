@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Cyber Arcade Engine Pro — Automated QA Acceptance Test Suite</title>
+  <style>
+    :root {
+      --bg: #050814;
+      --pass: #00ff88;
+      --fail: #ff007f;
+      --text: #f0f6fc;
+      --sub: #94a3b8;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: monospace;
+      padding: 32px;
+      line-height: 1.6;
+    }
+    h1 {
+      color: #00f0ff;
+      margin-bottom: 24px;
+    }
+    .test-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .pass {
+      color: var(--pass);
+      font-weight: bold;
+    }
+    .fail {
+      color: var(--fail);
+      font-weight: bold;
+    }
+    #summary {
+      margin-top: 32px;
+      padding: 16px;
+      border: 1px solid #00f0ff;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>ENGINE ACCEPTANCE TEST RUNNER</h1>
+  <div id="results"></div>
+  <div id="summary">Running tests...</div>
+
+  <script type="module">
+    import { LudoRules, LUDO_CONFIG } from '../js/games/ludo-rules.js';
+    import { LudoAI } from '../js/games/ludo-ai.js';
+    import { Scheduler } from '../js/core/scheduler.js';
+    import { GameLoop } from '../js/core/loop.js';
+    import { Storage } from '../js/core/storage.js';
+    import { Analytics } from '../js/analytics.js';
+    import TttGame from '../js/games/tictactoe.js';
+
+    const testResults = [];
+
+    function assert(name, condition) {
+      testResults.push({ name, pass: !!condition });
+    }
+
+    async function runAcceptanceTests() {
+      // 1. Ludo: Nest requires 6, cannot overshoot past 56
+      const nestLegalMovesWithout6 = LudoRules.getLegalMoves('RED', [0, 0, 0, 0], 4);
+      assert('Ludo: Nest token cannot mobilize on non-6 roll', nestLegalMovesWithout6.length === 0);
+
+      const nestLegalMovesWith6 = LudoRules.getLegalMoves('RED', [0, 0, 0, 0], 6);
+      assert('Ludo: Nest token mobilizes on a roll of 6', nestLegalMovesWith6.length === 4);
+
+      const overshootLegal = LudoRules.getLegalMoves('RED', [54], 4);
+      assert('Ludo: No overshoot permitted past step 56', overshootLegal.length === 0);
+
+      const exactLegal = LudoRules.getLegalMoves('RED', [54], 2);
+      assert('Ludo: Exact roll enters Home target', exactLegal.length === 1 && exactLegal[0] === 0);
+
+      // 2. Track Integrity: 52 Unique track indices, correct starts, and 8 verified safe stars
+      assert('Track Integrity: 52 outer track segments', LUDO_CONFIG.TRACK_LENGTH === 52);
+      assert('Track Integrity: Star indices [0, 8, 13, 21, 26, 34, 39, 47]',
+        JSON.stringify(LUDO_CONFIG.SAFE_SQUARES) === JSON.stringify([0, 8, 13, 21, 26, 34, 39, 47])
+      );
+      assert('Track Integrity: Starts RED=0, GREEN=13, YELLOW=26, BLUE=39',
+        LUDO_CONFIG.STARTS.RED === 0 &&
+        LUDO_CONFIG.STARTS.GREEN === 13 &&
+        LUDO_CONFIG.STARTS.YELLOW === 26 &&
+        LUDO_CONFIG.STARTS.BLUE === 39
+      );
+
+      // 3. Captures impossible on safe squares
+      const safeCaptureCheck = LudoRules.checkCapture('RED', 1, {
+        GREEN: [40]
+      });
+      assert('Ludo: Star safe zones prevent opponent captures', safeCaptureCheck === null);
+
+      // 4. Scheduler Delta-Time Freeze (No Softlocks or premature execution)
+      const scheduler = new Scheduler();
+      let timerFired = false;
+      const taskId = scheduler.after(100, () => { timerFired = true; });
+      scheduler.pause();
+      await new Promise(r => setTimeout(r, 120));
+      assert('Scheduler: Paused timer remains frozen past duration', timerFired === false);
+      scheduler.resume();
+      await new Promise(r => setTimeout(r, 120));
+      assert('Scheduler: Resumed timer executes remaining delta correctly', timerFired === true);
+      scheduler.dispose();
+
+      // 5. Fixed-Timestep Accumulator Simulation Loop
+      let updateTicks = 0;
+      const testLoop = new GameLoop({
+        onUpdate: () => { updateTicks++; },
+        onRender: () => {}
+      });
+      testLoop.start();
+      await new Promise(r => setTimeout(r, 100));
+      testLoop.stop();
+      assert('GameLoop: 60Hz fixed accumulator steps execute reliably (~6 ticks per 100ms)', updateTicks >= 5 && updateTicks <= 7);
+
+      // 6. TTT Minimax: Impossible AI never loses
+      function isAiUnbeatable(board, isX) {
+        const win = TttGame.checkWin(board);
+        if (win) return win.winner !== 'X';
+        if (TttGame.isBoardFull(board)) return true;
+
+        if (isX) {
+          for (let i = 0; i < 9; i++) {
+            if (board[i] === null) {
+              board[i] = 'X';
+              const safe = isAiUnbeatable(board, false);
+              board[i] = null;
+              if (!safe) return false;
+            }
+          }
+          return true;
+        } else {
+          let bestScore = -Infinity;
+          let bestMove = -1;
+          for (let i = 0; i < 9; i++) {
+            if (board[i] === null) {
+              board[i] = 'O';
+              const score = TttGame.minimax(board, 0, false);
+              board[i] = null;
+              if (score > bestScore) {
+                bestScore = score;
+                bestMove = i;
+              }
+            }
+          }
+          board[bestMove] = 'O';
+          const safe = isAiUnbeatable(board, true);
+          board[bestMove] = null;
+          return safe;
+        }
+      }
+      const aiUnbeatable = isAiUnbeatable(Array(9).fill(null), true);
+      assert('Cyber Grid AI: Exhaustive test proves Minimax AI never loses', aiUnbeatable === true);
+
+      // 7. Telemetry: Casual modes grant 0 XP and count no wins
+      Analytics.init();
+      const prevWins = Analytics.data.victories;
+      const resCasual = Analytics.record({ game: 'ludo', mode: '4P Local', outcome: 'WIN', ranked: false });
+      assert('Telemetry: Casual modes award 0 XP', resCasual.gainedXP === 0);
+      assert('Telemetry: Casual modes record no career victories', Analytics.data.victories === prevWins);
+
+      // 8. Storage Safe Engine & XSS Callsign Sanitization
+      const sampleScript = ['<', 'script', '>alert(1)<', '/script', '>'].join('');
+      Storage.setItem('__xss_probe__', sampleScript);
+      assert('SafeStorage: Writes and retrieves strings safely', Storage.getItem('__xss_probe__') === sampleScript);
+
+      const xssCallsign = ['<', 'script', '>alert("XSS")<', '/script', '>'].join('');
+      Analytics.setCallsign(xssCallsign);
+      assert('Security: Callsign sanitizes lengths without HTML entity evaluation', Analytics.data.callsign.length <= 14);
+
+      // Render Test UI Results
+      const container = document.getElementById('results');
+      container.innerHTML = testResults.map(t => `
+        <div class="test-row">
+          <span>${t.name}</span>
+          <span class="${t.pass ? 'pass' : 'fail'}">${t.pass ? 'PASS' : 'FAIL'}</span>
+        </div>
+      `).join('');
+
+      const passCount = testResults.filter(t => t.pass).length;
+      document.getElementById('summary').innerHTML = `
+        <strong>TOTAL TESTS:</strong> ${testResults.length} |
+        <span class="pass">PASSED: ${passCount}</span> |
+        <span class="${passCount === testResults.length ? 'pass' : 'fail'}">
+          ${passCount === testResults.length ? 'ALL ACCEPTANCE TESTS VERIFIED' : 'TEST FAILURES DETECTED'}
+        </span>
+      `;
+    }
+
+    runAcceptanceTests();
+  </script>
+</body>
+</html>

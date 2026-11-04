@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Cyber Arcade Engine Pro — Automated Asset Exporter</title>
+  <style>
+    body {
+      background: #050814;
+      color: #f0f6fc;
+      font-family: sans-serif;
+      padding: 32px;
+      text-align: center;
+    }
+    canvas {
+      border: 1px solid #00f0ff;
+      margin: 16px;
+      border-radius: 16px;
+    }
+    button {
+      padding: 12px 24px;
+      background: #00f0ff;
+      color: #050814;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Cyber Arcade Asset Generator</h1>
+  <p>Generates production PNG binaries (192px, 512px standard, and 512px maskable) directly from code.</p>
+  <button id="btnExport">GENERATE & DOWNLOAD ASSETS</button>
+  <br>
+  <canvas id="c192" width="192" height="192"></canvas>
+  <canvas id="c512" width="512" height="512"></canvas>
+  <canvas id="cMask" width="512" height="512"></canvas>
+
+  <script>
+    function drawIcon(canvas, isMaskable) {
+      const ctx = canvas.getContext('2d');
+      const s = canvas.width;
+
+      // Background
+      ctx.fillStyle = '#050814';
+      ctx.fillRect(0, 0, s, s);
+
+      // Geometric Console Emblem
+      const center = s / 2;
+      const radius = isMaskable ? s * 0.28 : s * 0.38;
+
+      ctx.save();
+      ctx.translate(center, center);
+
+      // Outer Isometric Hexagram
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const a = (i * Math.PI) / 3;
+        const x = Math.cos(a) * radius;
+        const y = Math.sin(a) * radius;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = '#00f0ff';
+      ctx.lineWidth = s * 0.04;
+      ctx.stroke();
+
+      // Inner Core Accent
+      ctx.beginPath();
+      ctx.arc(0, 0, radius * 0.45, 0, Math.PI * 2);
+      ctx.fillStyle = '#ff007f';
+      ctx.fill();
+
+      // Top Highlight
+      ctx.beginPath();
+      ctx.arc(0, 0, radius * 0.2, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    const c192 = document.getElementById('c192');
+    const c512 = document.getElementById('c512');
+    const cMask = document.getElementById('cMask');
+
+    drawIcon(c192, false);
+    drawIcon(c512, false);
+    drawIcon(cMask, true);
+
+    document.getElementById('btnExport').addEventListener('click', () => {
+      const download = (cvs, name) => {
+        const a = document.createElement('a');
+        a.download = name;
+        a.href = cvs.toDataURL('image/png');
+        a.click();
+      };
+      download(c192, 'icon-192.png');
+      setTimeout(() => download(c512, 'icon-512.png'), 200);
+      setTimeout(() => download(cMask, 'maskable-512.png'), 400);
+    });
+  </script>
+</body>
+</html>

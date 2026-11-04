@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+  <title>Parlour — Arcade</title>
+  <meta name="description" content="A classic parlour cabinet collection of offline board and arcade games.">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0a0d14">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    (function() {
+      const persisted = localStorage.getItem('cae_settings_theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = persisted || (prefersDark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+</head>
+<body>
+
+  <!-- Vector Sprite -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none;" aria-hidden="true">
+    <symbol id="icon-logo" viewBox="0 0 32 32">
+      <rect x="4" y="4" width="24" height="24" rx="4" fill="none" stroke="currentColor" stroke-width="2.5"/>
+      <circle cx="11" cy="11" r="2.5" fill="currentColor"/>
+      <circle cx="21" cy="21" r="2.5" fill="currentColor"/>
+      <path d="M11 21l10-10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="icon-sound-on" viewBox="0 0 24 24">
+      <path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+    </symbol>
+
+    <symbol id="icon-sound-off" viewBox="0 0 24 24">
+      <path fill="currentColor" d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+    </symbol>
+
+    <symbol id="icon-theme-night" viewBox="0 0 24 24">
+      <path fill="currentColor" d="M12.3 2a10 10 0 0 0-1.9 19.8 10 10 0 0 1 11.6-11.6A10 10 0 0 1 12.3 2z"/>
+    </symbol>
+
+    <symbol id="icon-theme-day" viewBox="0 0 24 24">
+      <path fill="currentColor" d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0-5a1 1 0 0 0 1-1V1a1 1 0 0 0-2 0v1a1 1 0 0 0 1 1zm0 19a1 1 0 0 0-1 1v1a1 1 0 0 0 2 0v-1a1 1 0 0 0-1-1zm10-10a1 1 0 0 0 0-2h-1a1 1 0 0 0 0 2h1zM4 12a1 1 0 0 0-1-1H2a1 1 0 0 0 0 2h1a1 1 0 0 0 1-1z"/>
+    </symbol>
+
+    <symbol id="icon-game-ludo" viewBox="0 0 32 32">
+      <rect x="3" y="3" width="26" height="26" rx="4" fill="none" stroke="#E53935" stroke-width="2.5"/>
+      <circle cx="10" cy="10" r="3" fill="#E53935"/>
+      <circle cx="22" cy="10" r="3" fill="#43A047"/>
+      <circle cx="22" cy="22" r="3" fill="#FDD835"/>
+      <circle cx="10" cy="22" r="3" fill="#1E88E5"/>
+      <path d="M16 3v26M3 16h26" stroke="#2B2B2B" stroke-width="1.8"/>
+    </symbol>
+
+    <symbol id="icon-game-snake" viewBox="0 0 32 32">
+      <path d="M6 24h6a4 4 0 0 0 4-4v-4a4 4 0 0 1 4-4h6" fill="none" stroke="#00e575" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="26" cy="12" r="3" fill="#00e575"/>
+      <circle cx="6" cy="24" r="2.5" fill="#ffb703"/>
+    </symbol>
+
+    <symbol id="icon-game-tictactoe" viewBox="0 0 32 32">
+      <circle cx="11" cy="11" r="5" fill="none" stroke="#00f0ff" stroke-width="2.5"/>
+      <path d="M17 17l8 8m0-8l-8 8" stroke="#ff2a5f" stroke-width="2.8" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="icon-game-memory" viewBox="0 0 32 32">
+      <rect x="5" y="6" width="10" height="14" rx="2" fill="none" stroke="#9aa5b8" stroke-width="2"/>
+      <rect x="17" y="12" width="10" height="14" rx="2" fill="#00f0ff" stroke-width="2"/>
+      <circle cx="10" cy="13" r="2" fill="#9aa5b8"/>
+      <circle cx="22" cy="19" r="2" fill="#00f0ff"/>
+    </symbol>
+
+    <symbol id="icon-game-flappy" viewBox="0 0 32 32">
+      <ellipse cx="14" cy="16" rx="8" ry="6" fill="#ffb703"/>
+      <polygon points="20,15 25,17 20,19" fill="#ff2a5f"/>
+      <circle cx="16" cy="14" r="1.5" fill="#0a0d14"/>
+      <path d="M8 17c-2 2-4 0-4-2s2-2 4 0" stroke="#0a0d14" stroke-width="2" fill="none"/>
+    </symbol>
+
+    <symbol id="icon-game-breakout" viewBox="0 0 32 32">
+      <rect x="4" y="6" width="6" height="4" rx="1" fill="#ff2a5f"/>
+      <rect x="13" y="6" width="6" height="4" rx="1" fill="#ffb703"/>
+      <rect x="22" y="6" width="6" height="4" rx="1" fill="#00e575"/>
+      <rect x="8" y="13" width="6" height="4" rx="1" fill="#00f0ff"/>
+      <rect x="17" y="13" width="6" height="4" rx="1" fill="#ffb703"/>
+      <circle cx="15" cy="21" r="2" fill="#ffffff"/>
+      <rect x="9" y="26" width="14" height="3" rx="1" fill="#ffb703" stroke="#000" stroke-width="1"/>
+    </symbol>
+
+    <symbol id="icon-game-2048" viewBox="0 0 32 32">
+      <rect x="4" y="4" width="24" height="24" rx="4" fill="#1c2433" stroke="#ffb703" stroke-width="2"/>
+      <rect x="7" y="7" width="8" height="8" rx="2" fill="#ffb703"/>
+      <rect x="17" y="7" width="8" height="8" rx="2" fill="#fb8500"/>
+      <rect x="7" y="17" width="8" height="8" rx="2" fill="#f72585"/>
+      <rect x="17" y="17" width="8" height="8" rx="2" fill="#00e575"/>
+    </symbol>
+
+    <symbol id="icon-game-minesweeper" viewBox="0 0 32 32">
+      <circle cx="16" cy="16" r="6" fill="#ff2a5f"/>
+      <line x1="16" y1="6" x2="16" y2="26" stroke="#ff2a5f" stroke-width="2"/>
+      <line x1="6" y1="16" x2="26" y2="16" stroke="#ff2a5f" stroke-width="2"/>
+      <line x1="9" y1="9" x2="23" y2="23" stroke="#ff2a5f" stroke-width="2"/>
+      <line x1="23" y1="9" x2="9" y2="23" stroke="#ff2a5f" stroke-width="2"/>
+      <circle cx="14" cy="14" r="1.5" fill="#ffffff"/>
+    </symbol>
+
+    <symbol id="icon-game-mole" viewBox="0 0 32 32">
+      <ellipse cx="16" cy="22" rx="11" ry="5" fill="#1c2433" stroke="#2B2B2B" stroke-width="1.5"/>
+      <path d="M10 22 C10 12, 22 12, 22 22 Z" fill="#8d5b4c"/>
+      <circle cx="14" cy="16" r="1.5" fill="#000000"/>
+      <circle cx="18" cy="16" r="1.5" fill="#000000"/>
+      <ellipse cx="16" cy="18" rx="2" ry="1.2" fill="#ffb703"/>
+    </symbol>
+
+    <symbol id="icon-game-connectfour" viewBox="0 0 32 32">
+      <rect x="4" y="6" width="24" height="20" rx="3" fill="#1b356b" stroke="#000" stroke-width="1.5"/>
+      <circle cx="9" cy="11" r="2.5" fill="#ff2a5f"/>
+      <circle cx="16" cy="11" r="2.5" fill="#ffb703"/>
+      <circle cx="23" cy="11" r="2.5" fill="#ff2a5f"/>
+      <circle cx="9" cy="18" r="2.5" fill="#ffb703"/>
+      <circle cx="16" cy="18" r="2.5" fill="#ff2a5f"/>
+      <circle cx="23" cy="18" r="2.5" fill="#ffb703"/>
+    </symbol>
+
+    <symbol id="icon-game-wordguess" viewBox="0 0 32 32">
+      <rect x="4" y="6" width="6" height="8" rx="1.5" fill="#00e575" stroke="#000" stroke-width="1"/>
+      <rect x="13" y="6" width="6" height="8" rx="1.5" fill="#ffb703" stroke="#000" stroke-width="1"/>
+      <rect x="22" y="6" width="6" height="8" rx="1.5" fill="#2b3447" stroke="#000" stroke-width="1"/>
+      <rect x="4" y="17" width="6" height="8" rx="1.5" fill="#2b3447" stroke="#000" stroke-width="1"/>
+      <rect x="13" y="17" width="6" height="8" rx="1.5" fill="#00e575" stroke="#000" stroke-width="1"/>
+      <rect x="22" y="17" width="6" height="8" rx="1.5" fill="#00e575" stroke="#000" stroke-width="1"/>
+    </symbol>
+  </svg>
+
+  <div class="ambient-bg" aria-hidden="true"></div>
+  <canvas id="fxCanvas" class="fx-canvas" aria-hidden="true"></canvas>
+  <div id="liveAnnouncer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- Main Arcade Shell -->
+  <div class="arcade-container" id="mainShell">
+    
+    <!-- Top Nav -->
+    <header class="top-nav">
+      <a href="#/" class="nav-brand" aria-label="Parlour Arcade Home">
+        <svg class="brand-icon"><use href="#icon-logo"/></svg>
+        <span class="brand-badge">SET 01</span>
+        <span class="brand-text">PARLOUR</span>
+      </a>
+
+      <div class="nav-actions">
+        <button type="button" class="btn-nav-pill" id="btnAudioToggle" title="Toggle Sound" aria-label="Toggle Sound">
+          <svg class="btn-icon-svg" id="iconAudioState"><use href="#icon-sound-on"/></svg>
+          <span class="btn-label-responsive" id="labelAudioState">SOUND</span>
+        </button>
+
+        <button type="button" class="btn-nav-pill" id="btnThemeToggle" title="Toggle Theme" aria-label="Toggle Theme">
+          <svg class="btn-icon-svg" id="iconThemeState"><use href="#icon-theme-night"/></svg>
+          <span class="btn-label-responsive" id="labelThemeState">NIGHT</span>
+        </button>
+
+        <button type="button" class="btn-nav-pill" id="btnProfileDrawerOpen" title="Player Profile" aria-label="Open Gamer Profile">
+          <span id="navAvatarEmoji">🎮</span>
+          <span class="btn-label-responsive" id="navCallsign">Player 1</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Lobby View -->
+    <main id="viewLobby">
+      <section class="dashboard-top-row">
+        <div class="hero-banner">
+          <span class="hero-tag">FEATURED BOARD</span>
+          <div class="hero-info">
+            <h2>Ludo Royale</h2>
+            <p>Roll, race, capture. Classic physical paper board with 3D ivory dice and moulded pawns.</p>
+          </div>
+          <div class="hero-cta-group">
+            <button type="button" class="btn-cta-primary" id="btnHeroDeploy">Play Match</button>
+            <button type="button" class="btn-cta-secondary" id="btnHeroContinue">Continue Saved</button>
+          </div>
+        </div>
+
+        <div class="telemetry-card">
+          <div class="telemetry-cell">
+            <span class="t-label">Playtime</span>
+            <span class="t-val" id="hudPlaytime">0m</span>
+          </div>
+          <div class="telemetry-cell">
+            <span class="t-label">Matches</span>
+            <span class="t-val" id="hudMatches">0</span>
+          </div>
+          <div class="telemetry-cell">
+            <span class="t-label">Win Rate</span>
+            <span class="t-val" id="hudWinRate">0%</span>
+          </div>
+          <div class="telemetry-cell">
+            <span class="t-label">Trophies</span>
+            <span class="t-val" id="hudTrophies">0</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Active Games Grid -->
+      <section class="lobby-simulations-section">
+        <div class="lobby-header">
+          <h2 class="section-title">Cabinet Games</h2>
+          <div class="live-indicator"><span class="live-dot"></span> Open</div>
+        </div>
+
+        <div class="game-grid" id="gameGridContainer">
+          <!-- 1. Ludo Royale -->
+          <div class="game-card-wrapper">
+            <div class="game-card" data-game="ludo" role="button" tabindex="0" aria-label="Play Ludo Royale">
+              <span class="card-badge">Board</span>
+              <svg class="card-icon-svg"><use href="#icon-game-ludo"/></svg>
+              <div class="game-card-content">
+                <h3>Ludo Royale</h3>
+                <p>Roll, race, capture. Four pawns each on a classic paper board.</p>
+                <span class="card-meta-stat" id="metaLudoStat">Wins: 0 | Total: 0</span>
+              </div>
+              <span class="btn-card-deploy">Play</span>
+            </div>
+          </div>
+
+          <!-- 2. Snake Rush -->
+          <div class="game-card-wrapper">
+            <div class="game-card" data-game="snake" role="button" tabindex="0" aria-label="Play Snake Rush">
+              <span class="card-badge">Arcade</span>
+              <svg class="card-icon-svg"><use href="#icon-game-snake"/></svg>
+              <div class="game-card-content">
+                <h3>Snake Rush</h3>
+                <p>Eat, grow, don't bite yourself. Smooth continuous movement.</p>
+                <span class="card-meta-stat" id="metaSnakeStat">Record: 0 pts</span>
+              </div>
+              <span class="btn-card-deploy">Play</span>
+            </div>
+          </div>
+
+          <!-- 3. Grid AI -->
+          <div class="game-card-wrapper">
+            <div class="game-card" data-game="tictactoe" role="button" tabindex="0" aria-label="Play Grid AI">
+              <span class="card-badge">Strategy</span>
+              <svg class="card-icon-svg"><use href="#icon-game-tictactoe"/></svg>
+              <div class="game-card-content">
+                <h3>Grid AI</h3>
+                <p>Noughts and crosses. The bot plays smart and doesn't blink.</p>
+                <span class="card-meta-stat" id="metaTttStat">Wins: 0 | Series: 0</span>
+              </div>
+              <span class="btn-card-deploy">Play</span>
+            </div>
+          </div>
+
+          <!-- 4. Memory Matrix -->
+          <div class="game-card-wrapper">
+            <div class="game-card" data-game="memory" role="button" tabindex="0" aria-label="Play Memory Matrix">
+              <span class="card-badge">Puzzle</span>
+              <svg class="card-icon-svg"><use href="#icon-game-memory"/></svg>
+              <div class="game-card-content">
+                <h3>Memory Matrix</h3>
+                <p>Sixteen cards, eight pairs, no notes. Beat the move target.</p>
+                <span class="card-meta-stat" id="metaMemoryStat">Best: - moves</span>
+              </div>
+              <span class="btn-card-deploy">Play</span>
+            </div>
+          </div>
+
+          <!-- 5. Flappy Pilot -->
+          <div class="game-card-wrapper">
+            <div class="game-card" data-game="flappy" role="button" tabindex="0" aria-label="Play Flappy Pilot">
+              <span class="card-badge">Reflex</span>
+              <svg class="card-icon-svg"><use href="#icon-game-flappy"/></svg>
+              <div class="game-card-content">
+                <h3>Flappy Pilot</h3>
+                <p>One button. Many gates. Perfectly calibrated hover flight.</p>
+                <span class="card-meta-stat" id="metaFlappyStat">Record: 0 gates</span>
+              </div>
+              <span class="btn-card-deploy">Play</span>
+            </div>
+          </div>
+
+          <!-- 6. Brick Breaker -->
+          <div class="game-card-wrapper">
+            <div class="game-card" data-game="breakout" role="button" tabindex="0" aria-label="Play Brick Breaker">
+              <span class="card-badge">Arcade</span>
+              <svg class="card-icon-svg"><use href="#icon-game-breakout"/></svg>
+              <div class="game-card-content">
+                <h3>Brick Breaker</h3>
+                <p>Paddle and ball physics. Clear multi-hit brick walls.</p>
+                <span class="card-meta-stat" id="metaBreakoutStat">High: 0 pts</span>
+              </div>
+              <span class="btn-card-deploy">Play</span>
+            </div>
+          </div>
+
+          <!-- 7. 2048 -->
+          <div class="game-card-wrapper">
+            <div class="game-card" data-game="twentyfortyeight" role="button" tabindex="0" aria-label="Play 2048">
+              <span class="card-badge">Puzzle</span>
+              <svg class="card-icon-svg"><use href="#icon-game-2048"/></svg>
+              <div class="game-card-content">
+                <h3>2048</h3>
+                <p>Slide matching numbers. Combine tiles to reach 2048.</p>
+                <span class="card-meta-stat" id="meta2048Stat">Best: 0 pts</span>
+              </div>
+              <span class="btn-card-deploy">Play</span>
+            </div>
+          </div>
+
+          <!-- 8. Minesweeper -->
+          <div class="game-card-wrapper">
+            <div class="game-card" data-game="minesweeper" role="button" tabindex="0" aria-label="Play Minesweeper">
+              <span class="card-badge">Logic</span>
+              <svg class="card-icon-svg"><use href="#icon-game-minesweeper"/></svg>
+              <div class="game-card-content">
+                <h3>Minesweeper</h3>
+                <p>9x9 field, 10 hidden mines. Uncover cells and place flags.</p>
+                <span class="card-meta-stat" id="metaMinesweeperStat">Cleared: 0</span>
+              </div>
+              <span class="btn-card-deploy">Play</span>
+            </div>
+          </div>
+
+          <!-- 9. Whack-a-Mole -->
+          <div class="game-card-wrapper">
+            <div class="game-card" data-game="mole" role="button" tabindex="0" aria-label="Play Whack-a-Mole">
+              <span class="card-badge">Reflex</span>
+              <svg class="card-icon-svg"><use href="#icon-game-mole"/></svg>
+              <div class="game-card-content">
+                <h3>Whack-a-Mole</h3>
+                <p>30 seconds on the clock. Tap moles before they duck back in.</p>
+                <span class="card-meta-stat" id="metaMoleStat">Record: 0 pts</span>
+              </div>
+              <span class="btn-card-deploy">Play</span>
+            </div>
+          </div>
+
+          <!-- 10. Connect 4 -->
+          <div class="game-card-wrapper">
+            <div class="game-card" data-game="connectfour" role="button" tabindex="0" aria-label="Play Connect 4">
+              <span class="card-badge">Board</span>
+              <svg class="card-icon-svg"><use href="#icon-game-connectfour"/></svg>
+              <div class="game-card-content">
+                <h3>Connect 4</h3>
+                <p>Vertical 7x6 drop board. Connect four discs in a row to win.</p>
+                <span class="card-meta-stat" id="metaC4Stat">Wins: 0 | Series: 0</span>
+              </div>
+              <span class="btn-card-deploy">Play</span>
+            </div>
+          </div>
+
+          <!-- 11. Word Guess -->
+          <div class="game-card-wrapper">
+            <div class="game-card" data-game="wordguess" role="button" tabindex="0" aria-label="Play Word Guess">
+              <span class="card-badge">Word</span>
+              <svg class="card-icon-svg"><use href="#icon-game-wordguess"/></svg>
+              <div class="game-card-content">
+                <h3>Word Guess</h3>
+                <p>Six attempts to guess a 5-letter word using coloured tile hints.</p>
+                <span class="card-meta-stat" id="metaWordStat">Solved: 0</span>
+              </div>
+              <span class="btn-card-deploy">Play</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Game Arena Overlay -->
+    <div id="viewArena" class="arena-overlay hidden" role="region" aria-label="Active Game Viewport">
+      <header class="arena-dock-top">
+        <button type="button" class="btn-nav-pill" id="btnArenaPause" aria-label="Pause Game">
+          <span>⏸</span> <span class="dock-btn-label">Pause</span>
+        </button>
+        <div class="arena-title-wrap">
+          <h2 class="arena-game-title" id="arenaGameTitle">Game</h2>
+        </div>
+        <div class="arena-dock-actions">
+          <button type="button" class="btn-nav-pill" id="btnArenaForfeit" aria-label="Give Up">
+            <span>🏳</span> <span class="dock-btn-label">Quit</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="arena-viewport-container" id="arenaViewport"></div>
+    </div>
+  </div>
+
+  <!-- Briefing Modal -->
+  <dialog id="dialogBriefing" class="console-dialog">
+    <div class="dialog-card">
+      <div class="dialog-badge" id="briefingGameBadge">Rules</div>
+      <h2 id="briefingGameTitle">How to Play</h2>
+      <ul class="briefing-bullet-list" id="briefingRulesList"></ul>
+      <div id="briefingCustomOptions"></div>
+      <div class="dialog-actions-row">
+        <button type="button" class="btn-dialog-secondary" id="btnBriefingCancel">Back</button>
+        <button type="button" class="btn-dialog-primary" id="btnBriefingLaunch">Start</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Pause Modal -->
+  <dialog id="dialogPause" class="console-dialog">
+    <div class="dialog-card">
+      <div class="dialog-badge">Paused</div>
+      <h2>Game Paused</h2>
+      <p>Take a breath. The board is waiting.</p>
+      <div class="dialog-actions-col">
+        <button type="button" class="btn-dialog-primary" id="btnPauseResume">Resume</button>
+        <button type="button" class="btn-dialog-secondary" id="btnPauseRestart">Restart</button>
+        <button type="button" class="btn-dialog-danger" id="btnPauseForfeit">Quit Match</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Quit Confirm Modal -->
+  <dialog id="dialogConfirmForfeit" class="console-dialog">
+    <div class="dialog-card">
+      <div class="dialog-badge" style="color:var(--status-loss);">Warning</div>
+      <h2>Leave this match?</h2>
+      <p>Leaving in the middle counts as a defeat on your record.</p>
+      <div class="dialog-actions-row">
+        <button type="button" class="btn-dialog-secondary" id="btnForfeitCancel">Stay</button>
+        <button type="button" class="btn-dialog-danger" id="btnForfeitConfirm">Quit</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Outcome Modal -->
+  <dialog id="dialogOutcome" class="console-dialog">
+    <div class="dialog-card">
+      <div class="dialog-badge" id="outcomeBadge">Results</div>
+      <h2 id="outcomeTitle">Match Finished</h2>
+      <p id="outcomeSubtitle">+100 XP gained</p>
+      <div id="outcomeDetails"></div>
+      <div class="dialog-actions-row">
+        <button type="button" class="btn-dialog-primary" id="btnOutcomeReplay">Play Again</button>
+        <button type="button" class="btn-dialog-secondary" id="btnOutcomeLobby">Lobby</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Profile Drawer -->
+  <aside id="profileDrawer" class="profile-drawer" role="dialog" aria-modal="true" aria-label="Player Profile">
+    <div class="drawer-header">
+      <h3>Player Profile</h3>
+      <button type="button" class="btn-nav-pill" id="btnProfileDrawerClose" aria-label="Close Profile">✕</button>
+    </div>
+    <div class="drawer-body">
+      <div class="drawer-user-card">
+        <div class="drawer-avatar-display" id="drawerAvatarDisplay">🎮</div>
+        <div class="drawer-user-meta">
+          <h4 id="drawerCallsign">Player 1</h4>
+          <span class="drawer-user-tier" id="drawerTier">Regular</span>
+        </div>
+      </div>
+
+      <div class="drawer-xp-box">
+        <label for="inputCallsign" class="t-label">Player Name (2-14 chars):</label>
+        <input type="text" id="inputCallsign" maxlength="14" autocomplete="off" autocorrect="off" spellcheck="false">
+
+        <label class="t-label" style="margin-top:12px;">Choose Avatar:</label>
+        <div id="avatarPickerGrid">
+          <button type="button" class="avatar-option">🎮</button>
+          <button type="button" class="avatar-option">⚡</button>
+          <button type="button" class="avatar-option">👑</button>
+          <button type="button" class="avatar-option">👾</button>
+          <button type="button" class="avatar-option">🔥</button>
+          <button type="button" class="avatar-option">🤖</button>
+        </div>
+      </div>
+
+      <div class="drawer-xp-box">
+        <div class="drawer-level-row">
+          <span id="labelPlayerLevel">Level 1</span>
+          <span id="labelPlayerXp">0 / 100 XP</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="barPlayerXp"></div>
+        </div>
+      </div>
+
+      <div>
+        <h4 class="section-subhead">Trophies & Badges</h4>
+        <div class="badges-grid" id="drawerBadgesGrid"></div>
+      </div>
+
+      <div>
+        <h4 class="section-subhead">Recent Games</h4>
+        <div id="drawerLogsList"></div>
+      </div>
+    </div>
+  </aside>
+  <div id="drawerBackdrop" class="drawer-backdrop" aria-hidden="true"></div>
+
+  <!-- Popover Toast -->
+  <div id="popoverToastContainer" class="toast-top-layer" popover="manual">
+    <div class="achievement-toast-card" id="achievementToastCard">
+      <div class="toast-icon" id="toastBadgeIcon">🏆</div>
+      <div>
+        <div class="toast-label">Trophy Earned</div>
+        <div class="toast-title" id="toastBadgeTitle">First Victory</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hotkeys HUD -->
+  <footer class="hotkeys-hud-bar" aria-hidden="true">
+    <div class="hotkey-item"><span class="kbd-badge">M</span> Mute</div>
+    <div class="hotkey-item"><span class="kbd-badge">T</span> Theme</div>
+    <div class="hotkey-item"><span class="kbd-badge">P</span> Pause</div>
+    <div class="hotkey-item"><span class="kbd-badge">ESC</span> Back</div>
+  </footer>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

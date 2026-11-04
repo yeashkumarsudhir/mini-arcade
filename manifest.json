@@ -1,0 +1,70 @@
+{
+  "id": "parlour-arcade-cabinet-v1",
+  "name": "Parlour Arcade",
+  "short_name": "Parlour",
+  "description": "A classic parlour cabinet collection of offline board and arcade games.",
+  "start_url": "./#/",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a0d14",
+  "theme_color": "#0a0d14",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Ludo Royale",
+      "short_name": "Ludo",
+      "description": "Roll, race, and capture on a classic paper board",
+      "url": "./#/game/ludo",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Snake Rush",
+      "short_name": "Snake",
+      "description": "Eat pellets, grow longer, and avoid walls",
+      "url": "./#/game/snake",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Grid AI",
+      "short_name": "Grid AI",
+      "description": "Play noughts and crosses against a smart bot",
+      "url": "./#/game/tictactoe",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Memory Matrix",
+      "short_name": "Memory",
+      "description": "Find all eight pairs in fewer moves",
+      "url": "./#/game/memory",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Flappy Pilot",
+      "short_name": "Flappy",
+      "description": "Fly between the gates without crashing",
+      "url": "./#/game/flappy",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "categories": ["games", "arcade", "entertainment"]
+}
