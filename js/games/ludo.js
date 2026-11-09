@@ -2,6 +2,7 @@
  * js/games/ludo.js
  * Classic Physical Ludo Orchestrator & Game State Machine
  * Real Paper Board, Moulded Plastic Pawns & 3D Ivory Tumbling Dice
+ * Enhanced with Ludo-King Style Custom Player / Bot Lobby
  */
 
 import { LudoRules, LUDO_COLORS, LUDO_PALETTE } from './ludo-rules.js';
@@ -90,11 +91,11 @@ export const LudoGame = {
   scheduler: new SafeScheduler(),
   resizeObserver: null,
 
-  fsm: 'WAIT_ROLL',
+  fsm: 'LOBBY',
 
   activeColor: 'RED',
   humanColor: 'RED',
-  mode: '1P_3BOT',
+  mode: 'CUSTOM',
   difficulty: 'Normal',
   pace: 'NORMAL',
   hopMs: 150,
@@ -106,6 +107,16 @@ export const LudoGame = {
   diceValue: 1,
   consecutiveSixes: 0,
   isRolling: false,
+
+  lobbyConfig: {
+    playerCount: 4,
+    seats: [
+      { color: 'RED', active: true, isBot: false, name: 'Player 1' },
+      { color: 'GREEN', active: true, isBot: true, name: 'Bot 1' },
+      { color: 'YELLOW', active: true, isBot: true, name: 'Bot 2' },
+      { color: 'BLUE', active: true, isBot: true, name: 'Bot 3' }
+    ]
+  },
 
   state: {
     tokens: {
@@ -135,74 +146,96 @@ export const LudoGame = {
     this.scheduler = new SafeScheduler();
 
     this.container.innerHTML = `
-      <div class="ludo-tabletop-container" id="ludoTableContainer">
+      <div class="ludo-tabletop-container" id="ludoTableContainer" style="display:flex; flex-direction:column; align-items:center; width:100%; max-width:600px; margin:0 auto; gap:12px;">
+        
         <!-- Physical Board Viewport -->
-        <div class="ludo-board-frame" id="ludoBoardFrame">
-          <canvas id="ludoCanvas" width="540" height="540"></canvas>
+        <div class="ludo-board-frame" id="ludoBoardFrame" style="width:100%; display:flex; justify-content:center;">
+          <canvas id="ludoCanvas" width="540" height="540" style="max-width:100%; height:auto; touch-action:none; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.25);"></canvas>
         </div>
 
         <!-- Cabinet Side Deck Controls -->
-        <div class="ludo-deck-controls">
-          <!-- 4-Player Card Slots -->
-          <div class="ludo-players-grid" id="ludoPlayerSlots"></div>
+        <div class="ludo-deck-controls" style="width:100%; display:flex; flex-direction:column; gap:10px;">
+          <!-- Active Player Card Slots -->
+          <div class="ludo-players-grid" id="ludoPlayerSlots" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(110px, 1fr)); gap:6px;"></div>
 
           <!-- Turn Status Readout -->
-          <div class="telemetry-cell" style="text-align:center; padding:12px;">
-            <div id="ludoStatusLine" class="t-val" style="font-size:1.15rem; color:var(--ludo-red); margin:0;" aria-live="polite">
-              Your turn - roll dice
+          <div class="telemetry-cell" style="text-align:center; padding:10px 12px; background:var(--bg-surface, #fff); border:2px solid var(--border-strong, #141712); border-radius:10px;">
+            <div id="ludoStatusLine" class="t-val" style="font-size:1.1rem; font-weight:800; color:var(--ludo-red, #E53935); margin:0;" aria-live="polite">
+              Starting Match...
             </div>
-            <div id="ludoSubNotice" style="font-size:0.75rem; color:var(--text-dim); margin-top:4px; font-weight:600;">
-              Press SPACE or click the dice
+            <div id="ludoSubNotice" style="font-size:0.75rem; color:var(--text-dim, #666); margin-top:4px; font-weight:600;">
+              Tap Roll Dice or press SPACE
             </div>
           </div>
 
-          <!-- 3D Ivory Dice Tray -->
-          <div class="ludo-dice-tray" id="ludoDiceTray">
+          <!-- Interactive Dice Tray -->
+          <div class="ludo-dice-tray" id="ludoDiceTray" style="background:var(--bg-surface, #fff); border:2px solid var(--border-strong, #141712); border-radius:12px; padding:12px; display:flex; flex-direction:column; align-items:center; gap:8px;">
             <div class="ludo-roll-again-badge" id="ludoRollAgainBadge">ROLL AGAIN!</div>
 
-            <div class="ludo-dice-viewport" id="ludoDiceViewport" role="button" tabindex="0" aria-label="Roll Dice">
+            <!-- Visual Dice Target -->
+            <div class="ludo-dice-viewport" id="ludoDiceViewport" role="button" tabindex="0" aria-label="Roll Dice" style="width:68px; height:68px; cursor:pointer;">
               <div class="ludo-dice-shadow" id="ludoDiceShadow"></div>
               <div class="ludo-dice-cube" id="ludoDiceCube">
-                <div class="ludo-dice-face face-1">
-                  <span class="ludo-pip red-pip"></span>
-                </div>
-                <div class="ludo-dice-face face-2">
-                  <span class="ludo-pip"></span><span class="ludo-pip"></span>
-                </div>
-                <div class="ludo-dice-face face-3">
-                  <span class="ludo-pip"></span><span class="ludo-pip"></span><span class="ludo-pip"></span>
-                </div>
-                <div class="ludo-dice-face face-4">
-                  <span class="ludo-pip"></span><span class="ludo-pip"></span><span class="ludo-pip"></span><span class="ludo-pip"></span>
-                </div>
-                <div class="ludo-dice-face face-5">
-                  <span class="ludo-pip"></span><span class="ludo-pip"></span><span class="ludo-pip"></span><span class="ludo-pip"></span><span class="ludo-pip"></span>
-                </div>
-                <div class="ludo-dice-face face-6">
-                  <span class="ludo-pip"></span><span class="ludo-pip"></span><span class="ludo-pip"></span><span class="ludo-pip"></span><span class="ludo-pip"></span><span class="ludo-pip"></span>
-                </div>
+                <div class="ludo-dice-face face-1"><span class="ludo-pip red-pip"></span></div>
+                <div class="ludo-dice-face face-2"><span class="ludo-pip"></span><span class="ludo-pip"></span></div>
+                <div class="ludo-dice-face face-3"><span class="ludo-pip"></span><span class="ludo-pip"></span><span class="ludo-pip"></span></div>
+                <div class="ludo-dice-face face-4"><span class="ludo-pip"></span><span class="ludo-pip"></span><span class="ludo-pip"></span><span class="ludo-pip"></span></div>
+                <div class="ludo-dice-face face-5"><span class="ludo-pip"></span><span class="ludo-pip"></span><span class="ludo-pip"></span><span class="ludo-pip"></span><span class="ludo-pip"></span></div>
+                <div class="ludo-dice-face face-6"><span class="ludo-pip"></span><span class="ludo-pip"></span><span class="ludo-pip"></span><span class="ludo-pip"></span><span class="ludo-pip"></span><span class="ludo-pip"></span></div>
               </div>
             </div>
 
-            <button type="button" class="btn-cta-primary" id="btnRollDiceDirect" style="width:100%; height:40px; font-size:0.8rem;">
-              Roll Dice (Space)
-            </button>
+            <div style="display:flex; width:100%; gap:8px;">
+              <button type="button" class="btn-cta-primary" id="btnRollDiceDirect" style="flex:2; height:42px; font-size:0.85rem; font-weight:800;">
+                Roll Dice (Space)
+              </button>
+              <button type="button" id="btnOpenLobbyModal" class="btn-cta-secondary" style="flex:1; height:42px; font-size:0.75rem; font-weight:700; border:2px solid var(--border-strong, #000); border-radius:6px; cursor:pointer;">
+                ⚙️ Setup
+              </button>
+            </div>
           </div>
 
           <!-- Quick Switches -->
-          <div class="telemetry-cell" style="gap:8px; padding:12px;">
+          <div class="telemetry-cell" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:var(--bg-surface, #fff); border:1.5px solid var(--border-strong, #ccc); border-radius:8px;">
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.75rem; font-weight:700; cursor:pointer;">
+              <input type="checkbox" id="chkAutoMove" checked> Auto-move
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.75rem; font-weight:700; cursor:pointer;">
+              <input type="checkbox" id="chkColorBlind"> Numbers
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.75rem; font-weight:700; cursor:pointer;">
+              <input type="checkbox" id="chkTableTilt"> Tilt 3D
+            </label>
+          </div>
+        </div>
+
+        <!-- Ludo King Style Match Setup Modal -->
+        <div id="ludoLobbyModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center; padding:16px;">
+          <div style="background:var(--bg-surface, #fff); border:3px solid var(--border-strong, #000); border-radius:12px; max-width:420px; width:100%; padding:20px; box-shadow:4px 4px 0px #000; display:flex; flex-direction:column; gap:16px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-size:0.75rem; color:var(--text-sub); font-weight:700;">Auto-move single</span>
-              <input type="checkbox" id="chkAutoMove" checked style="cursor:pointer;">
+              <h3 style="margin:0; font-family:'Archivo Black', sans-serif; font-size:1.15rem;">🎲 Ludo Match Setup</h3>
+              <button type="button" id="btnCloseLobbyModal" style="background:none; border:none; font-size:1.4rem; cursor:pointer; line-height:1;">&times;</button>
             </div>
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-size:0.75rem; color:var(--text-sub); font-weight:700;">Pawn numbers</span>
-              <input type="checkbox" id="chkColorBlind" style="cursor:pointer;">
+
+            <!-- Player Count Selector -->
+            <div>
+              <span class="ludo-opt-group-label" style="display:block; font-size:0.75rem; font-weight:800; text-transform:uppercase; color:var(--text-dim, #666); margin-bottom:6px;">Select Players</span>
+              <div class="ludo-pill-selector" id="ludoPlayerCountPills" style="display:flex; gap:8px;">
+                <button type="button" class="ludo-pill-btn" data-count="2">2 Players</button>
+                <button type="button" class="ludo-pill-btn" data-count="3">3 Players</button>
+                <button type="button" class="ludo-pill-btn active" data-count="4">4 Players</button>
+              </div>
             </div>
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-size:0.75rem; color:var(--text-sub); font-weight:700;">Perspective tilt</span>
-              <input type="checkbox" id="chkTableTilt" style="cursor:pointer;">
+
+            <!-- Seat Customization Grid -->
+            <div>
+              <span class="ludo-opt-group-label" style="display:block; font-size:0.75rem; font-weight:800; text-transform:uppercase; color:var(--text-dim, #666); margin-bottom:6px;">Seats (Human vs Bot)</span>
+              <div id="ludoSeatsContainer" class="ludo-seat-config-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;"></div>
             </div>
+
+            <button type="button" class="btn-cta-primary" id="btnStartLobbyGame" style="height:44px; width:100%; font-size:0.9rem; font-weight:900;">
+              START MATCH
+            </button>
           </div>
         </div>
       </div>
@@ -211,7 +244,6 @@ export const LudoGame = {
     this.canvas = document.getElementById('ludoCanvas');
     this.renderer = new LudoRenderer(this.canvas);
 
-    // Global reference for console testing
     window.LudoGameInstance = this;
 
     this.bindEvents();
@@ -220,10 +252,6 @@ export const LudoGame = {
   },
 
   start(opts = {}) {
-    this.mode = opts.mode || '1P_3BOT';
-    this.difficulty = opts.difficulty || 'Normal';
-    this.humanColor = opts.pickedColor || 'RED';
-    this.activeColor = 'RED';
     this.matchEndedCalled = false;
     this.consecutiveSixes = 0;
     this.fsm = 'WAIT_ROLL';
@@ -231,25 +259,14 @@ export const LudoGame = {
     this.legalMoves = [];
     this.selectedTokenIdx = null;
 
-    if (this.mode === '1P_1BOT') {
-      this.players = [
-        { color: 'RED', isBot: this.humanColor !== 'RED', name: this.humanColor === 'RED' ? 'You' : 'Bot' },
-        { color: 'YELLOW', isBot: this.humanColor !== 'YELLOW', name: this.humanColor === 'YELLOW' ? 'You' : 'Bot' }
-      ];
-    } else if (this.mode === '4P_LOCAL') {
-      this.players = [
-        { color: 'RED', isBot: false, name: 'P1 Red' },
-        { color: 'GREEN', isBot: false, name: 'P2 Green' },
-        { color: 'YELLOW', isBot: false, name: 'P3 Yellow' },
-        { color: 'BLUE', isBot: false, name: 'P4 Blue' }
-      ];
+    if (opts.customPlayers && Array.isArray(opts.customPlayers)) {
+      this.players = opts.customPlayers;
     } else {
-      this.players = LUDO_COLORS.map(c => ({
-        color: c,
-        isBot: c !== this.humanColor,
-        name: c === this.humanColor ? 'You' : `Bot (${this.difficulty})`
-      }));
+      this.players = this.buildPlayersFromLobby();
     }
+
+    this.humanColor = this.players.find(p => !p.isBot)?.color || this.players[0].color;
+    this.activeColor = this.players[0].color;
 
     this.state = {
       tokens: {
@@ -262,23 +279,98 @@ export const LudoGame = {
       finishRank: []
     };
 
-    const saved = localStorage.getItem('parlour_ludo_autosave');
-    if (opts.resumeSave && saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        this.state = parsed.state;
-        this.activeColor = parsed.activeColor;
-        this.mode = parsed.mode;
-      } catch {}
-    }
-
     this.renderPlayerSlots();
     this.syncUI();
     this.setDiceFace(1);
 
     if (this.getCurrentPlayer().isBot) {
-      this.triggerBotCycle();
+      this.scheduler.after(500, () => this.triggerBotCycle());
     }
+  },
+
+  buildPlayersFromLobby() {
+    const activeSeats = this.lobbyConfig.seats.filter(s => s.active);
+    return activeSeats.map((seat, idx) => ({
+      color: seat.color,
+      isBot: seat.isBot,
+      name: seat.isBot ? `Bot (${seat.color})` : `P${idx + 1} (${seat.color})`
+    }));
+  },
+
+  openLobbyModal() {
+    const modal = document.getElementById('ludoLobbyModal');
+    if (!modal) return;
+    this.renderLobbySeats();
+    modal.style.display = 'flex';
+  },
+
+  closeLobbyModal() {
+    const modal = document.getElementById('ludoLobbyModal');
+    if (modal) modal.style.display = 'none';
+  },
+
+  renderLobbySeats() {
+    const container = document.getElementById('ludoSeatsContainer');
+    if (!container) return;
+
+    container.innerHTML = this.lobbyConfig.seats.map((seat) => {
+      const paletteColor = LUDO_PALETTE[seat.color];
+      return `
+        <div class="ludo-seat-card ${seat.active ? '' : 'disabled'}" style="border-left: 4px solid ${paletteColor}; padding:6px 8px; background:var(--bg-card, #f9f9f9); border:1px solid #ddd; border-left:5px solid ${paletteColor}; border-radius:6px; opacity:${seat.active ? '1' : '0.4'};">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <strong style="color:${paletteColor}; font-size:0.8rem;">${seat.color}</strong>
+            <span style="font-size:0.65rem; color:#666;">${seat.active ? 'Active' : 'Off'}</span>
+          </div>
+          <button type="button" class="btn-seat-toggle" data-color="${seat.color}" ${!seat.active ? 'disabled' : ''} style="width:100%; font-size:0.75rem; padding:4px 6px; border:1px solid #444; border-radius:4px; cursor:pointer; background:${seat.isBot ? '#f0f0f0' : '#4CAF50'}; color:${seat.isBot ? '#333' : '#fff'}; font-weight:700;">
+            ${seat.isBot ? '🤖 Bot (AI)' : '👤 Human'}
+          </button>
+        </div>
+      `;
+    }).join('');
+
+    container.querySelectorAll('.btn-seat-toggle').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const color = e.currentTarget.dataset.color;
+        const seat = this.lobbyConfig.seats.find(s => s.color === color);
+        if (seat) {
+          seat.isBot = !seat.isBot;
+          this.renderLobbySeats();
+        }
+      });
+    });
+  },
+
+  setPlayerCount(count) {
+    this.lobbyConfig.playerCount = count;
+
+    if (count === 2) {
+      this.lobbyConfig.seats = [
+        { color: 'RED', active: true, isBot: false, name: 'P1 Red' },
+        { color: 'GREEN', active: false, isBot: true, name: 'Bot' },
+        { color: 'YELLOW', active: true, isBot: true, name: 'P2 / Bot' },
+        { color: 'BLUE', active: false, isBot: true, name: 'Bot' }
+      ];
+    } else if (count === 3) {
+      this.lobbyConfig.seats = [
+        { color: 'RED', active: true, isBot: false, name: 'P1 Red' },
+        { color: 'GREEN', active: true, isBot: true, name: 'P2 Green' },
+        { color: 'YELLOW', active: true, isBot: true, name: 'P3 Yellow' },
+        { color: 'BLUE', active: false, isBot: true, name: 'Bot' }
+      ];
+    } else {
+      this.lobbyConfig.seats = [
+        { color: 'RED', active: true, isBot: false, name: 'P1 Red' },
+        { color: 'GREEN', active: true, isBot: true, name: 'Bot Green' },
+        { color: 'YELLOW', active: true, isBot: true, name: 'Bot Yellow' },
+        { color: 'BLUE', active: true, isBot: true, name: 'Bot Blue' }
+      ];
+    }
+
+    document.querySelectorAll('#ludoPlayerCountPills .ludo-pill-btn').forEach(btn => {
+      btn.classList.toggle('active', parseInt(btn.dataset.count) === count);
+    });
+
+    this.renderLobbySeats();
   },
 
   getCurrentPlayer() {
@@ -295,6 +387,20 @@ export const LudoGame = {
 
     document.getElementById('ludoDiceViewport')?.addEventListener('click', handleRollTrigger);
     document.getElementById('btnRollDiceDirect')?.addEventListener('click', handleRollTrigger);
+
+    document.getElementById('btnOpenLobbyModal')?.addEventListener('click', () => this.openLobbyModal());
+    document.getElementById('btnCloseLobbyModal')?.addEventListener('click', () => this.closeLobbyModal());
+
+    document.querySelectorAll('#ludoPlayerCountPills .ludo-pill-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        this.setPlayerCount(parseInt(e.currentTarget.dataset.count));
+      });
+    });
+
+    document.getElementById('btnStartLobbyGame')?.addEventListener('click', () => {
+      this.closeLobbyModal();
+      this.restart();
+    });
 
     document.getElementById('chkAutoMove')?.addEventListener('change', (e) => {
       this.autoMoveSingle = e.target.checked;
@@ -325,7 +431,7 @@ export const LudoGame = {
         const cy = gy * cell + cell / 2;
         const dist = Math.hypot(clickX - cx, clickY - cy);
 
-        if (dist <= cell * 0.72) {
+        if (dist <= cell * 0.75) {
           this.commitMove(tokenIdx);
           break;
         }
@@ -385,7 +491,7 @@ export const LudoGame = {
     this.resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const frameW = entry.contentRect.width;
-        const targetSize = Math.max(320, Math.min(frameW - 20, 540));
+        const targetSize = Math.max(300, Math.min(frameW, 540));
         this.renderer.resize(targetSize);
       }
     });
@@ -402,10 +508,10 @@ export const LudoGame = {
 
     this.diceValue = Math.floor(Math.random() * 6) + 1;
 
-    FXEngine.diceRoll();
+    try { FXEngine.diceRoll(); } catch {}
 
     this.animateDiceTumble(this.diceValue, () => {
-      FXEngine.diceLand();
+      try { FXEngine.diceLand(); } catch {}
       this.isRolling = false;
       this.handlePostRoll();
     });
@@ -443,21 +549,21 @@ export const LudoGame = {
 
     const anim = cube.animate([
       { transform: 'translateY(0px) scale(1) rotateX(0deg) rotateY(0deg)' },
-      { transform: 'translateY(-36px) scale(1.2) rotateX(360deg) rotateY(180deg)', offset: 0.35 },
-      { transform: `translateY(-10px) scale(1.05) rotateX(${endX * 0.75}deg) rotateY(${endY * 0.75}deg)`, offset: 0.7 },
+      { transform: 'translateY(-28px) scale(1.15) rotateX(360deg) rotateY(180deg)', offset: 0.35 },
+      { transform: `translateY(-8px) scale(1.05) rotateX(${endX * 0.75}deg) rotateY(${endY * 0.75}deg)`, offset: 0.7 },
       { transform: `translateY(0px) scale(1) rotateX(${endX}deg) rotateY(${endY}deg)`, offset: 1 }
     ], {
-      duration: 800,
+      duration: 650,
       easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
       fill: 'forwards'
     });
 
     if (shadow) {
       shadow.animate([
-        { transform: 'scale(1)', opacity: 0.45 },
-        { transform: 'scale(0.55)', opacity: 0.15, offset: 0.35 },
-        { transform: 'scale(1)', opacity: 0.45, offset: 1 }
-      ], { duration: 800, fill: 'forwards' });
+        { transform: 'scale(1)', opacity: 0.4 },
+        { transform: 'scale(0.6)', opacity: 0.15, offset: 0.35 },
+        { transform: 'scale(1)', opacity: 0.4, offset: 1 }
+      ], { duration: 650, fill: 'forwards' });
     }
 
     anim.onfinish = () => {
@@ -490,7 +596,7 @@ export const LudoGame = {
       this.consecutiveSixes++;
       if (this.consecutiveSixes === 3) {
         this.consecutiveSixes = 0;
-        this.showStatusNotification('3 Sixes in a row. Turn skipped.');
+        this.showStatusNotification('3 Sixes in a row! Turn skipped.');
         this.scheduler.after(700, () => this.advanceTurn());
         return;
       }
@@ -525,7 +631,7 @@ export const LudoGame = {
       if (this.legalMoves.length === 1 && this.autoMoveSingle) {
         this.fsm = 'RESOLVE';
         this.selectedTokenIdx = this.legalMoves[0];
-        this.scheduler.after(350, () => this.commitMove(this.legalMoves[0]));
+        this.scheduler.after(300, () => this.commitMove(this.legalMoves[0]));
       } else {
         this.fsm = 'WAIT_PICK';
         this.selectedTokenIdx = this.legalMoves[0];
@@ -573,7 +679,7 @@ export const LudoGame = {
       progress: 0
     };
 
-    FXEngine.tokenHop();
+    try { FXEngine.tokenHop(); } catch {}
 
     const startTime = performance.now();
     const duration = this.hopMs;
@@ -609,42 +715,31 @@ export const LudoGame = {
     if (capture) {
       this.state.tokens[capture.color][capture.tokenIndex] = -1;
       extraTurn = true;
-      FXEngine.cutOpponent();
+      try { FXEngine.cutOpponent(); } catch {}
       this.showStatusNotification(`${color} captured ${capture.color}!`);
     }
 
     if (finalP === 56) {
       extraTurn = true;
-      FXEngine.playTone(880, 'triangle', 0.1, 0.2);
+      try { FXEngine.playTone(880, 'triangle', 0.1, 0.2); } catch {}
 
       const allHome = this.state.tokens[color].every(step => step === 56);
       if (allHome) {
         if (!this.state.finishRank.includes(color)) {
           this.state.finishRank.push(color);
         }
-        FXEngine.confetti(80);
+        try { FXEngine.confetti(80); } catch {}
 
         this.renderPlayerSlots();
 
-        if (color === this.humanColor) {
-          this.showStatusNotification('Victory! All 4 pawns home!');
-          this.scheduler.after(400, () => this.concludeMatch('WIN'));
-          return;
-        }
-
         if (this.state.finishRank.length >= this.players.length - 1) {
-          const humanWon = (this.state.finishRank[0] === this.humanColor);
-          this.scheduler.after(400, () => this.concludeMatch(humanWon ? 'WIN' : 'LOSS'));
+          const humanRank = this.state.finishRank.indexOf(this.humanColor);
+          const didHumanWin = (humanRank === 0);
+          this.scheduler.after(400, () => this.concludeMatch(didHumanWin ? 'WIN' : 'LOSS'));
           return;
         }
       }
     }
-
-    localStorage.setItem('parlour_ludo_autosave', JSON.stringify({
-      state: this.state,
-      activeColor: this.activeColor,
-      mode: this.mode
-    }));
 
     if (extraTurn) {
       this.fsm = 'WAIT_ROLL';
@@ -702,7 +797,7 @@ export const LudoGame = {
     }
 
     if (sub) {
-      sub.textContent = curPlayer.isBot ? 'Bot is thinking...' : 'Press SPACE or click the dice';
+      sub.textContent = curPlayer.isBot ? 'Bot is thinking...' : 'Tap Dice or press SPACE';
     }
 
     if (tray) {
@@ -711,6 +806,7 @@ export const LudoGame = {
 
     if (rollBtn) {
       rollBtn.disabled = curPlayer.isBot || this.fsm !== 'WAIT_ROLL';
+      rollBtn.textContent = curPlayer.isBot ? 'Bot Rolling...' : 'Roll Dice (Space)';
     }
 
     this.renderPlayerSlots();
@@ -728,11 +824,11 @@ export const LudoGame = {
       const rankText = rankIdx !== -1 ? `(#${rankIdx + 1})` : `Home ${finished}/4`;
 
       return `
-        <div class="ludo-player-card ${isCur ? 'active' : ''}" style="--card-color:${LUDO_PALETTE[p.color]};">
-          <span class="ludo-player-chip" style="background:${LUDO_PALETTE[p.color]};"></span>
-          <div class="ludo-player-meta">
-            <span class="ludo-player-name">${p.name}</span>
-            <span class="ludo-player-home-count">${rankText}</span>
+        <div class="ludo-player-card ${isCur ? 'active' : ''}" style="display:flex; align-items:center; gap:6px; padding:6px; border:2px solid ${isCur ? LUDO_PALETTE[p.color] : '#ccc'}; border-radius:6px; background:${isCur ? 'rgba(0,0,0,0.04)' : 'transparent'};">
+          <span style="width:12px; height:12px; border-radius:50%; background:${LUDO_PALETTE[p.color]}; display:inline-block; border:1px solid #000;"></span>
+          <div style="display:flex; flex-direction:column; line-height:1.1;">
+            <span style="font-size:0.75rem; font-weight:800; color:${isCur ? LUDO_PALETTE[p.color] : 'inherit'};">${p.name}</span>
+            <span style="font-size:0.65rem; color:#666;">${rankText}</span>
           </div>
         </div>
       `;
@@ -760,14 +856,11 @@ export const LudoGame = {
     this.matchEndedCalled = true;
     this.fsm = 'GAME_OVER';
 
-    localStorage.removeItem('parlour_ludo_autosave');
-
     const rank = this.state.finishRank.indexOf(this.humanColor) + 1 || (outcome === 'WIN' ? 1 : 4);
-    const isRanked = (this.mode !== '4P_LOCAL');
 
     const outcomePayload = {
-      summary: `Finished #${rank} in ${this.mode === '4P_LOCAL' ? 'Casual 4P' : this.difficulty}`,
-      ranked: isRanked
+      summary: `Finished #${rank} in Custom Match`,
+      ranked: false
     };
 
     if (typeof ArcadeApp.triggerMatchEnd === 'function') {
@@ -787,7 +880,7 @@ export const LudoGame = {
 
   restart() {
     this.scheduler.cancelAll();
-    this.start({ mode: this.mode, difficulty: this.difficulty, pickedColor: this.humanColor });
+    this.start();
   },
 
   destroy() {
