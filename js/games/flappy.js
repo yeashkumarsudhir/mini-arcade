@@ -1,13 +1,7 @@
-/**
- * js/games/flappy.js
- * Flappy Pilot — Calibrated Tactile Flight Simulator
- * Features: Time-based gravity in px/s, zero auto-drop hover, 2px flat cabinet art
- */
-
 export default {
   id: 'flappy',
-  title: 'Flappy Pilot',
-  accent: '#ffb703',
+  title: 'Flappy Bird',
+  accent: '#d29922',
 
   ctx: null,
   container: null,
@@ -38,38 +32,33 @@ export default {
 
     this.container.innerHTML = `
       <div class="arena-dual-layout">
-        <!-- Flight Board Frame -->
         <div class="arena-board-frame">
-          <canvas id="flappyCanvas" width="400" height="520" style="display:block; max-width:100%; height:auto; border-radius:var(--radius-btn); background:#0c1017; cursor:pointer;"></canvas>
+          <canvas id="flappyCanvas" width="400" height="520" style="display:block; max-width:100%; height:auto; border-radius:6px; background:#0e1117; cursor:pointer;"></canvas>
         </div>
 
-        <!-- Right Side Control Deck -->
         <div class="arena-side-controls">
-          <!-- Gate Counter -->
-          <div class="telemetry-cell" style="text-align:center; padding:16px;">
-            <span class="t-label">Gates Cleared</span>
-            <div id="flappyScoreDisplay" class="t-val" style="font-size:2.4rem; color:var(--status-coin); margin:4px 0;">
+          <div class="telemetry-cell" style="text-align:center; padding:12px;">
+            <span class="t-label">Gates</span>
+            <div id="flappyScoreDisplay" class="t-val" style="font-size:2rem; color:var(--status-coin); margin:2px 0;">
               0
             </div>
-            <div id="flappyBestDisplay" style="font-size:0.75rem; color:var(--text-dim); font-weight:700;">
-              Record: 0 gates
+            <div id="flappyBestDisplay" style="font-size:0.75rem; color:var(--text-dim);">
+              Best: 0 gates
             </div>
           </div>
 
-          <!-- Pace / Difficulty Selector -->
-          <div class="telemetry-cell" style="gap:8px;">
-            <span class="t-label">Flight Pace</span>
+          <div class="telemetry-cell" style="gap:6px;">
+            <span class="t-label">Speed</span>
             <div style="display:flex; gap:6px;">
-              <button type="button" class="btn-nav-pill" id="btnFlappyChill" style="flex:1; justify-content:center; font-size:0.72rem; padding:0 4px;">Chill</button>
-              <button type="button" class="btn-nav-pill" id="btnFlappyNormal" style="flex:1; justify-content:center; font-size:0.72rem; padding:0 4px; border-color:var(--status-coin);">Normal</button>
-              <button type="button" class="btn-nav-pill" id="btnFlappyHard" style="flex:1; justify-content:center; font-size:0.72rem; padding:0 4px;">Hard</button>
+              <button type="button" class="btn-nav-pill" id="btnFlappyChill" style="flex:1; justify-content:center; font-size:0.75rem;">Chill</button>
+              <button type="button" class="btn-nav-pill" id="btnFlappyNormal" style="flex:1; justify-content:center; font-size:0.75rem; border-color:var(--brand-accent);">Normal</button>
+              <button type="button" class="btn-nav-pill" id="btnFlappyHard" style="flex:1; justify-content:center; font-size:0.75rem;">Fast</button>
             </div>
           </div>
 
-          <!-- Control Instruction Card -->
-          <div class="telemetry-cell" style="text-align:center; padding:14px;">
-            <span style="font-size:0.8rem; color:var(--text-sub); line-height:1.4;">
-              Tap canvas or press <strong style="color:var(--status-coin);">Space</strong> to flap
+          <div class="telemetry-cell" style="text-align:center; padding:10px;">
+            <span style="font-size:0.75rem; color:var(--text-sub);">
+              Tap canvas or press Space to jump
             </span>
           </div>
         </div>
@@ -111,12 +100,12 @@ export default {
     this.presetKey = key;
     ['btnFlappyChill', 'btnFlappyNormal', 'btnFlappyHard'].forEach(id => {
       const btn = document.getElementById(id);
-      if (btn) btn.style.borderColor = 'var(--border-strong)';
+      if (btn) btn.style.borderColor = 'var(--border-line)';
     });
 
-    if (key === 'CHILL') document.getElementById('btnFlappyChill')?.style.setProperty('border-color', 'var(--status-coin)');
-    else if (key === 'NORMAL') document.getElementById('btnFlappyNormal')?.style.setProperty('border-color', 'var(--status-coin)');
-    else if (key === 'HARD') document.getElementById('btnFlappyHard')?.style.setProperty('border-color', 'var(--status-coin)');
+    if (key === 'CHILL') document.getElementById('btnFlappyChill')?.style.setProperty('border-color', 'var(--brand-accent)');
+    else if (key === 'NORMAL') document.getElementById('btnFlappyNormal')?.style.setProperty('border-color', 'var(--brand-accent)');
+    else if (key === 'HARD') document.getElementById('btnFlappyHard')?.style.setProperty('border-color', 'var(--brand-accent)');
   },
 
   loadHighScore() {
@@ -177,14 +166,14 @@ export default {
 
     if (!this.isFlying) {
       this.hoverTime += dt * 4;
-      this.droneY = 240 + Math.sin(this.hoverTime) * 12;
+      this.droneY = 240 + Math.sin(this.hoverTime) * 10;
       return;
     }
 
     this.velocity += cfg.g * dt;
     this.droneY += this.velocity * dt;
 
-    if (this.droneY >= this.canvas.height - 20 || this.droneY <= 15) {
+    if (this.droneY >= this.canvas.height - 18 || this.droneY <= 12) {
       this.handleCrash();
       return;
     }
@@ -198,7 +187,7 @@ export default {
     const droneBox = {
       x: 75,
       y: this.droneY,
-      radius: 12
+      radius: 11
     };
 
     for (let i = this.laserPipes.length - 1; i >= 0; i--) {
@@ -208,7 +197,7 @@ export default {
       if (!pipe.passed && pipe.x < droneBox.x) {
         pipe.passed = true;
         this.score++;
-        this.ctx.fx.playTone(880, 'sine', 0.04, 0.12);
+        this.ctx.fx.playTone(880, 'sine', 0.04, 0.1);
         if (this.score > this.bestScore) this.bestScore = this.score;
         this.updateScoreDisplay();
       }
@@ -247,8 +236,7 @@ export default {
 
     this.ctx.recordResult('LOSS', {
       score: this.score,
-      summary: `Cleared ${this.score} gates (${this.presetKey.toLowerCase()})`,
-      ranked: true
+      summary: `Cleared ${this.score} gates (${this.presetKey.toLowerCase()})`
     });
   },
 
@@ -256,7 +244,7 @@ export default {
     const scoreEl = document.getElementById('flappyScoreDisplay');
     const bestEl = document.getElementById('flappyBestDisplay');
     if (scoreEl) scoreEl.textContent = this.score;
-    if (bestEl) bestEl.textContent = `Record: ${this.bestScore} gates`;
+    if (bestEl) bestEl.textContent = `Best: ${this.bestScore} gates`;
   },
 
   render(alpha) {
@@ -265,50 +253,26 @@ export default {
     const w = this.canvas.width;
     const h = this.canvas.height;
 
-    // Solid cabinet background
-    ctx.fillStyle = '#0f141f';
+    ctx.fillStyle = '#0e1117';
     ctx.fillRect(0, 0, w, h);
 
-    // Subtle 1px vertical guides
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
-    ctx.lineWidth = 1;
-    const time = performance.now() / 1000;
-    const offset = (time * 30) % 36;
-
-    for (let x = -offset; x < w; x += 36) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, h);
-      ctx.stroke();
-    }
-
-    // Flat Physical Barriers (Pipes)
+    // Pipes
     this.laserPipes.forEach(p => {
       // Top Pipe
-      ctx.fillStyle = '#1c2433';
+      ctx.fillStyle = '#161b22';
       ctx.fillRect(p.x, 0, p.width, p.topH);
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#30363d';
+      ctx.lineWidth = 1;
       ctx.strokeRect(p.x, 0, p.width, p.topH);
-
-      // Top Pipe Collar Lip
-      ctx.fillStyle = '#29354b';
-      ctx.fillRect(p.x - 3, p.topH - 12, p.width + 6, 12);
-      ctx.strokeRect(p.x - 3, p.topH - 12, p.width + 6, 12);
 
       // Bottom Pipe
       const bottomY = p.topH + p.gateH;
-      ctx.fillStyle = '#1c2433';
+      ctx.fillStyle = '#161b22';
       ctx.fillRect(p.x, bottomY, p.width, h - bottomY);
       ctx.strokeRect(p.x, bottomY, p.width, h - bottomY);
-
-      // Bottom Pipe Collar Lip
-      ctx.fillStyle = '#29354b';
-      ctx.fillRect(p.x - 3, bottomY, p.width + 6, 12);
-      ctx.strokeRect(p.x - 3, bottomY, p.width + 6, 12);
     });
 
-    // Render Pilot Bird
+    // Bird
     const droneX = 75;
     const droneY = this.droneY;
     const tilt = this.isFlying ? Math.min(Math.PI / 4, Math.max(-Math.PI / 4, this.velocity * 0.002)) : 0;
@@ -317,107 +281,61 @@ export default {
     ctx.translate(droneX, droneY);
     ctx.rotate(tilt);
 
-    // Bird Body
     ctx.beginPath();
-    ctx.ellipse(0, 0, 14, 11, 0, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffb703';
+    ctx.ellipse(0, 0, 13, 10, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#d29922';
     ctx.fill();
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
 
-    // Eye
     ctx.beginPath();
-    ctx.arc(6, -3, 3, 0, Math.PI * 2);
+    ctx.arc(5, -3, 2.5, 0, Math.PI * 2);
     ctx.fillStyle = '#ffffff';
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(7, -3, 1.5, 0, Math.PI * 2);
+    ctx.arc(6, -3, 1.2, 0, Math.PI * 2);
     ctx.fillStyle = '#000000';
     ctx.fill();
 
-    // Beak
     ctx.beginPath();
-    ctx.moveTo(12, 0);
-    ctx.lineTo(19, 2);
-    ctx.lineTo(12, 5);
+    ctx.moveTo(11, 0);
+    ctx.lineTo(17, 2);
+    ctx.lineTo(11, 4);
     ctx.closePath();
-    ctx.fillStyle = '#ff2a5f';
+    ctx.fillStyle = '#f85149';
     ctx.fill();
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    // Wing
-    const wingY = Math.sin(time * 20) * 4;
-    ctx.beginPath();
-    ctx.ellipse(-4, wingY, 6, 4, 0, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffa000';
-    ctx.fill();
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
 
     ctx.restore();
 
-    // In-Canvas Flat Result Plaque on Crash
+    // Plain game over plaque
     if (this.isCrashed) {
-      const boxW = 260;
-      const boxH = 190;
+      const boxW = 240;
+      const boxH = 140;
       const boxX = (w - boxW) / 2;
-      const boxY = 145;
+      const boxY = 170;
 
-      // Hard shadow box
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(boxX + 4, boxY + 4, boxW, boxH);
-
-      // Card surface
-      ctx.fillStyle = '#161c28';
+      ctx.fillStyle = '#161b22';
       ctx.fillRect(boxX, boxY, boxW, boxH);
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'var(--border-line)';
+      ctx.lineWidth = 1;
       ctx.strokeRect(boxX, boxY, boxW, boxH);
 
-      ctx.font = '900 17px "Archivo Black", sans-serif';
-      ctx.fillStyle = '#ff2a5f';
+      ctx.font = '700 16px Inter, sans-serif';
+      ctx.fillStyle = '#f85149';
       ctx.textAlign = 'center';
-      ctx.fillText('ROUND OVER', w / 2, boxY + 36);
+      ctx.fillText('Game Over', w / 2, boxY + 36);
 
-      ctx.font = '700 11px Inter, sans-serif';
-      ctx.fillStyle = '#9aa5b8';
-      ctx.fillText('GATES CLEARED', w / 2, boxY + 68);
+      ctx.font = '600 12px Inter, sans-serif';
+      ctx.fillStyle = 'var(--text-sub)';
+      ctx.fillText(`Gates cleared: ${this.score}`, w / 2, boxY + 68);
 
-      ctx.font = '900 28px "Archivo Black", sans-serif';
-      ctx.fillStyle = '#ffb703';
-      ctx.fillText(this.score, w / 2, boxY + 102);
-
-      let medal = 'Keep practicing';
-      if (this.score >= 15) medal = '🥇 Gold Badge';
-      else if (this.score >= 8) medal = '🥈 Silver Badge';
-      else if (this.score >= 3) medal = '🥉 Bronze Badge';
-
-      ctx.font = '700 11px Inter, sans-serif';
-      ctx.fillStyle = '#00f0ff';
-      ctx.fillText(medal, w / 2, boxY + 132);
-
-      ctx.font = '600 10px Inter, sans-serif';
-      ctx.fillStyle = '#657185';
-      ctx.fillText(this.retryLockTimer > 0 ? 'Wait...' : 'Tap canvas or Space to retry', w / 2, boxY + 165);
+      ctx.font = '500 11px Inter, sans-serif';
+      ctx.fillStyle = 'var(--text-dim)';
+      ctx.fillText(this.retryLockTimer > 0 ? 'Wait...' : 'Tap or press Space to retry', w / 2, boxY + 105);
     }
   },
 
-  pause() {
-    if (this.loop) this.loop.pause();
-  },
-
-  resume() {
-    if (this.loop) this.loop.resume();
-  },
-
-  restart() {
-    this.start({ preset: this.presetKey });
-  },
-
+  pause() { if (this.loop) this.loop.pause(); },
+  resume() { if (this.loop) this.loop.resume(); },
+  restart() { this.start({ preset: this.presetKey }); },
   destroy() {
     if (this.loop) this.loop.stop();
     this.container = null;

@@ -1,8 +1,3 @@
-/**
- * js/core/scheduler.js
- * Deterministic Freeze-Aware Task Scheduler
- * Pauses remaining delta-time and resumes without softlocks or timer racing.
- */
 export class Scheduler {
   constructor() {
     this.tasks = new Map();
@@ -61,7 +56,7 @@ export class Scheduler {
     try {
       task.fn();
     } catch (err) {
-      console.error(`[Scheduler] Task ${id} threw:`, err);
+      console.error(`[Scheduler] Task ${id} error:`, err);
     }
 
     if (task.isInterval && !this.disposed && this.tasks.has(id)) {

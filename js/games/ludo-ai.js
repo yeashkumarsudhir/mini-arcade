@@ -1,29 +1,19 @@
-/**
- * js/games/ludo-ai.js
- * Ludo Bot Decision Logic
- * Difficulty levels: Casual (random), Normal (heuristic scoring), Smart (two-ply minimax search)
- */
-
 import { LudoRules, LUDO_CONFIG, LUDO_COLORS } from './ludo-rules.js';
 
 export const LudoAI = {
-  chooseMove(difficulty, color, gameState, roll, legalMoves) {
+  chooseMove(difficulty, color, gameState, roll, legalMoves, activePlayers = []) {
     if (!legalMoves || legalMoves.length === 0) return -1;
     if (legalMoves.length === 1) return legalMoves[0];
 
     const mode = (difficulty || 'Normal').toLowerCase();
 
-    switch (mode) {
-      case 'easy':
-      case 'casual':
-        return this.chooseEasyMove(legalMoves);
-      case 'hard':
-      case 'smart':
-        return this.chooseSmartMinimax(color, gameState, roll, legalMoves);
-      case 'normal':
-      default:
-        return this.chooseNormalHeuristic(color, gameState, roll, legalMoves);
+    if (mode === 'easy') {
+      return this.chooseEasyMove(legalMoves);
     }
+    if (mode === 'hard') {
+      return this.chooseSmartMove(color, gameState, roll, legalMoves, activePlayers);
+    }
+    return this.chooseNormalMove(color, gameState, roll, legalMoves);
   },
 
   chooseEasyMove(legalMoves) {
@@ -31,14 +21,14 @@ export const LudoAI = {
     return legalMoves[idx];
   },
 
-  chooseNormalHeuristic(color, gameState, roll, legalMoves) {
+  chooseNormalMove(color, gameState, roll, legalMoves) {
     let bestScore = -Infinity;
     let bestMove = legalMoves[0];
 
     for (const tokenIdx of legalMoves) {
       const curP = gameState.tokens[color][tokenIdx];
       const targetP = (curP === -1) ? 0 : curP + roll;
-      const score = this.evaluateSingleMove(color, gameState, tokenIdx, targetP, roll);
+      const score = this.evaluateMove(color, gameState, tokenIdx, targetP);
 
       if (score > bestScore) {
         bestScore = score;
@@ -49,50 +39,45 @@ export const LudoAI = {
     return bestMove;
   },
 
-  evaluateSingleMove(color, gameState, tokenIdx, targetP, roll) {
+  evaluateMove(color, gameState, tokenIdx, targetP) {
     let score = 0;
 
-    // Leaving the yard on rolling 6
+    // Bring pawn out of yard
     if (gameState.tokens[color][tokenIdx] === -1 && targetP === 0) {
-      score += 35;
-      return score;
+      return 50;
     }
 
-    // Landing directly into home goal
+    // Direct home finish
     if (targetP === 56) {
-      score += 90;
-      return score;
+      return 100;
     }
 
-    // Advancing down private home column
+    // Advance inside private home stretch
     if (targetP > 50 && targetP < 56) {
       score += 40;
     }
 
-    // Capturing an opposing pawn on the main track
+    // Main circuit: check capture and safe squares
     if (targetP <= 50) {
       const capture = LudoRules.checkCapture(gameState, color, targetP);
       if (capture) {
-        score += 100;
+        score += 85;
       }
 
       const targetTrack = LudoRules.getTrackIndex(color, targetP);
-
-      // Safe square landing
       if (LudoRules.isSafeSquare(targetTrack)) {
-        score += 30;
-      } else if (this.isVulnerableToAttack(gameState, color, targetTrack)) {
-        score -= 25;
+        score += 25;
+      } else if (this.isVulnerable(gameState, color, targetTrack)) {
+        score -= 20;
       }
     }
 
     // Steady forward progress
-    score += targetP * 1.2;
-
+    score += targetP * 1.5;
     return score;
   },
 
-  isVulnerableToAttack(gameState, myColor, targetTrackIdx) {
+  isVulnerable(gameState, myColor, targetTrackIdx) {
     for (const oppColor of LUDO_COLORS) {
       if (oppColor === myColor) continue;
       const oppTokens = gameState.tokens[oppColor];
@@ -111,16 +96,16 @@ export const LudoAI = {
     return false;
   },
 
-  chooseSmartMinimax(myColor, gameState, roll, legalMoves) {
+  chooseSmartMove(myColor, gameState, roll, legalMoves, activePlayers) {
     let bestVal = -Infinity;
     let bestToken = legalMoves[0];
 
     for (const tokenIdx of legalMoves) {
       const { nextState } = LudoRules.applyMove(gameState, myColor, tokenIdx, roll);
-      const expectedEval = this.evaluateChanceLayer(nextState, myColor);
+      const evalScore = this.evaluateNextState(nextState, myColor, activePlayers);
 
-      if (expectedEval > bestVal) {
-        bestVal = expectedEval;
+      if (evalScore > bestVal) {
+        bestVal = evalScore;
         bestToken = tokenIdx;
       }
     }
@@ -128,52 +113,28 @@ export const LudoAI = {
     return bestToken;
   },
 
-  evaluateChanceLayer(stateAfterMyMove, myColor) {
-    const myIdx = LUDO_COLORS.indexOf(myColor);
-    const nextOppColor = LUDO_COLORS[(myIdx + 1) % 4];
+  evaluateNextState(stateAfterMove, myColor, activePlayers) {
+    const activeColors = (activePlayers && activePlayers.length > 0)
+      ? activePlayers.map(p => p.color)
+      : LUDO_COLORS;
 
-    let totalScore = 0;
-
-    for (let simRoll = 1; simRoll <= 6; simRoll++) {
-      const oppMoves = LudoRules.getLegalMoves(stateAfterMyMove, nextOppColor, simRoll);
-
-      if (oppMoves.length === 0) {
-        totalScore += this.evaluateBoardState(stateAfterMyMove, myColor);
-      } else {
-        let worstForMe = Infinity;
-        for (const oppToken of oppMoves) {
-          const { nextState: oppNextState } = LudoRules.applyMove(stateAfterMyMove, nextOppColor, oppToken, simRoll);
-          const evalScore = this.evaluateBoardState(oppNextState, myColor);
-          if (evalScore < worstForMe) {
-            worstForMe = evalScore;
-          }
-        }
-        totalScore += worstForMe;
-      }
-    }
-
-    return totalScore / 6;
-  },
-
-  evaluateBoardState(state, myColor) {
     let utility = 0;
-
-    for (const col of LUDO_COLORS) {
+    for (const col of activeColors) {
       const isMe = (col === myColor);
-      const mult = isMe ? 1 : -0.33;
-      const pawns = state.tokens[col];
+      const mult = isMe ? 1 : -0.4;
+      const pawns = stateAfterMove.tokens[col] || [];
 
       for (const p of pawns) {
         if (p === 56) {
-          utility += 150 * mult;
+          utility += 120 * mult;
         } else if (p === -1) {
-          utility -= 20 * mult;
+          utility -= 15 * mult;
         } else {
-          utility += p * 2.0 * mult;
+          utility += p * 1.6 * mult;
           if (p <= 50) {
             const track = LudoRules.getTrackIndex(col, p);
             if (LudoRules.isSafeSquare(track)) {
-              utility += 25 * mult;
+              utility += 20 * mult;
             }
           }
         }

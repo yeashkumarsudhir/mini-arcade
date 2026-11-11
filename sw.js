@@ -1,10 +1,4 @@
-/**
- * sw.js
- * Parlour Arcade Service Worker
- * Resilient offline pre-caching, Stale-While-Revalidate asset delivery, and instant activation
- */
-
-const CACHE_NAME = 'parlour-cabinet-cache-v5';
+const CACHE_NAME = 'mini-arcade-cache-v6';
 
 const PRECACHE_MANIFEST = [
   './',
@@ -53,7 +47,7 @@ self.addEventListener('install', (event) => {
         try {
           await cache.add(asset);
         } catch (err) {
-          console.warn(`[ServiceWorker] Optional precache skipped for: ${asset}`, err);
+          console.warn(`[ServiceWorker] Skipped caching: ${asset}`, err);
         }
       }
     })
@@ -67,7 +61,6 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         keys.map((key) => {
           if (key !== CACHE_NAME) {
-            console.log(`[ServiceWorker] Evicting outdated cache layer: ${key}`);
             return caches.delete(key);
           }
         })
@@ -87,7 +80,6 @@ self.addEventListener('fetch', (event) => {
 
   if (req.method !== 'GET') return;
 
-  // Navigation requests: fetch network first, fallback to offline.html
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req).catch(() => {
@@ -97,7 +89,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static Assets: Stale-While-Revalidate strategy
   event.respondWith(
     caches.match(req, { ignoreSearch: true }).then((cachedResponse) => {
       const fetchPromise = fetch(req).then((networkResponse) => {

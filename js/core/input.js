@@ -1,8 +1,3 @@
-/**
- * js/core/input.js
- * Unified Hardware Input Abstraction
- * Normalized action mapping across Keyboard, Pointer, 24px Swipes and Gamepads.
- */
 export class InputManager {
   constructor(targetElement = window) {
     this.target = targetElement;
@@ -11,7 +6,6 @@ export class InputManager {
     this.listeners = [];
     this.disposed = false;
 
-    // Pointer gesture coordinates
     this.touchStartX = 0;
     this.touchStartY = 0;
     this.swipeThreshold = 24;
@@ -45,7 +39,6 @@ export class InputManager {
 
       const action = this.bindings.get(e.code);
       if (action) {
-        // Prevent window scroll on arrow keys/space
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
           e.preventDefault();
         }

@@ -1,7 +1,3 @@
-/**
- * js/core/bus.js
- * Synchronous / Asynchronous Decoupled Event Emitter Bus
- */
 export class EventBus {
   constructor() {
     this.listeners = new Map();

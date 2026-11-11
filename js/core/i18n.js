@@ -1,7 +1,3 @@
-/**
- * js/core/i18n.js
- * Zero-Dependency String Localization Table (EN / HI)
- */
 export const I18N = {
   current: 'en',
   strings: {
@@ -9,31 +5,31 @@ export const I18N = {
       sound: 'SOUND',
       night: 'NIGHT',
       day: 'DAY',
-      deploy: 'DEPLOY',
+      deploy: 'PLAY',
       pause: 'PAUSE',
-      forfeit: 'FORFEIT',
+      forfeit: 'QUIT',
       resume: 'RESUME',
       restart: 'RESTART',
-      abort: 'ABORT',
-      victory: 'VICTORY SECURED',
-      defeat: 'MISSION FAILED',
-      draw: 'STALEMATE DRAW',
+      abort: 'CANCEL',
+      victory: 'YOU WON',
+      defeat: 'GAME OVER',
+      draw: 'MATCH DRAW',
       level: 'LEVEL'
     },
     hi: {
-      sound: 'ध्वनि',
-      night: 'रात्रि',
+      sound: 'आवाज़',
+      night: 'रात',
       day: 'दिन',
-      deploy: 'आरंभ',
+      deploy: 'खेलें',
       pause: 'रोकें',
-      forfeit: 'त्यागें',
+      forfeit: 'छोड़ें',
       resume: 'जारी रखें',
-      restart: 'पुनः आरंभ',
+      restart: 'फिर से',
       abort: 'रद्द करें',
-      victory: 'विजय प्राप्त',
-      defeat: 'मिशन असफल',
-      draw: 'मुकाबला बराबरी',
-      level: 'स्तर'
+      victory: 'जीत गए!',
+      defeat: 'हार गए',
+      draw: 'मैच बराबरी',
+      level: 'लेवल'
     }
   },
 

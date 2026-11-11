@@ -1,7 +1,3 @@
-/**
- * js/core/storage.js
- * Safe Storage Access Engine with In-Memory Volatile Fallback
- */
 export class SafeStorage {
   constructor() {
     this.memory = new Map();
@@ -10,7 +6,7 @@ export class SafeStorage {
 
   check() {
     try {
-      const test = '__cae_storage_probe__';
+      const test = '__mini_arcade_probe__';
       localStorage.setItem(test, test);
       localStorage.removeItem(test);
       return true;

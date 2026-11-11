@@ -1,15 +1,10 @@
-/**
- * js/core/loop.js
- * Fixed-Timestep Accumulator Engine (60Hz Logic, Alpha Render Interpolation)
- * Completely decouples simulation physics from display refresh rate (60/120/144 Hz).
- */
 export class GameLoop {
   constructor({ onUpdate, onRender }) {
     this.onUpdate = onUpdate;
     this.onRender = onRender;
 
-    this.fixedStep = 1000 / 60; // 16.666ms per update
-    this.maxAccumulated = 100;  // Clamps spike lag to 100ms
+    this.fixedStep = 1000 / 60;
+    this.maxAccumulated = 100;
     this.accumulator = 0;
     this.lastTime = 0;
     this.rafId = null;

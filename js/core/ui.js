@@ -1,7 +1,3 @@
-/**
- * js/core/ui.js
- * UI Manager & Dialog Stack Layer (Single Source of Truth for Paused State)
- */
 export class UIManager {
   constructor() {
     this.dialogStack = [];

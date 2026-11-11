@@ -3,14 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cyber Arcade Engine Pro — Signal Severed</title>
+  <title>Offline — Mini Arcade</title>
   <style>
     :root {
-      --bg-0: #050814;
-      --neon-pink: #ff007f;
-      --neon-cyan: #00f0ff;
-      --text-main: #f0f6fc;
-      --text-sub: #94a3b8;
+      --bg: #0e1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-sub: #8b949e;
+      --accent: #2f81f7;
     }
     *, *::before, *::after {
       box-sizing: border-box;
@@ -18,60 +19,53 @@
       padding: 0;
     }
     body {
-      background-color: var(--bg-0);
-      color: var(--text-main);
+      background-color: var(--bg);
+      color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 24px;
+      padding: 20px;
       text-align: center;
     }
     .offline-card {
-      background: rgba(14, 22, 42, 0.85);
-      border: 2px solid var(--neon-pink);
-      border-radius: 20px;
-      padding: 36px 24px;
-      max-width: 440px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 32px 20px;
+      max-width: 380px;
       width: 100%;
-      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6), 0 0 20px rgba(255, 0, 127, 0.3);
-    }
-    .icon {
-      font-size: 3.5rem;
-      margin-bottom: 16px;
     }
     h1 {
-      font-size: 1.4rem;
-      letter-spacing: 2px;
-      color: var(--neon-pink);
-      margin-bottom: 12px;
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 8px;
     }
     p {
       color: var(--text-sub);
-      font-size: 0.95rem;
-      line-height: 1.5;
-      margin-bottom: 24px;
+      font-size: 0.85rem;
+      line-height: 1.45;
+      margin-bottom: 20px;
     }
     .retry-btn {
-      height: 44px;
+      height: 38px;
       width: 100%;
-      background: linear-gradient(135deg, var(--neon-cyan), #0077ff);
-      color: #050814;
-      font-weight: 800;
-      letter-spacing: 1.5px;
+      background: var(--accent);
+      color: #ffffff;
+      font-weight: 600;
+      font-size: 0.85rem;
       border: none;
-      border-radius: 12px;
+      border-radius: 6px;
       cursor: pointer;
     }
   </style>
 </head>
 <body>
   <div class="offline-card">
-    <div class="icon">📡</div>
-    <h1>CARRIER LOST</h1>
-    <p>Telemetry uplink severed. The local standalone engine core is preserved in application cache.</p>
-    <button class="retry-btn" onclick="window.location.reload()">RESTORE TELEMETRY</button>
+    <h1>You're Offline</h1>
+    <p>Internet connection nahi mil raha hai. Saved local cache se khelne ke liye reload dabayein.</p>
+    <button class="retry-btn" onclick="window.location.reload()">Reload Page</button>
   </div>
 </body>
 </html>

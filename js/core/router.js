@@ -1,7 +1,3 @@
-/**
- * js/core/router.js
- * Hash Route Controller with Native Back-Button Navigation Guard
- */
 export class Router {
   constructor(routes = {}) {
     this.routes = routes;

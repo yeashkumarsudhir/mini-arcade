@@ -1,13 +1,7 @@
-/**
- * js/games/minesweeper.js
- * Minesweeper — Tactile Physical Grid Edition
- * 9x9 grid, 10 mines, safe first click, flagging, flood fill reveal
- */
-
 export default {
   id: 'minesweeper',
   title: 'Minesweeper',
-  accent: '#ff2a5f',
+  accent: '#f85149',
 
   ctx: null,
   container: null,
@@ -28,36 +22,35 @@ export default {
 
     this.container.innerHTML = `
       <div class="arena-dual-layout">
-        <div class="arena-board-frame" style="padding:14px; background:var(--bg-panel); border:2px solid var(--border-strong); border-radius:var(--radius-card); box-shadow:var(--shadow-offset-lg);">
-          <div id="minesGrid" style="display:grid; grid-template-columns:repeat(9, 34px); grid-template-rows:repeat(9, 34px); gap:4px; background:var(--bg-base); padding:8px; border-radius:6px; border:2px solid var(--border-strong);"></div>
+        <div class="arena-board-frame" style="padding:10px; background:var(--bg-panel); border:1px solid var(--border-line); border-radius:8px;">
+          <div id="minesGrid" style="display:grid; grid-template-columns:repeat(9, 32px); grid-template-rows:repeat(9, 32px); gap:3px; background:var(--bg-base); padding:6px; border-radius:4px; border:1px solid var(--border-line);"></div>
         </div>
 
         <div class="arena-side-controls">
-          <div class="telemetry-cell" style="padding:16px;">
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; text-align:center;">
+          <div class="telemetry-cell" style="padding:12px;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; text-align:center;">
               <div>
                 <span class="t-label">Mines Left</span>
-                <div id="minesRemaining" class="t-val" style="font-size:2rem; color:var(--status-loss); margin-top:2px;">10</div>
+                <div id="minesRemaining" class="t-val" style="font-size:1.6rem; color:var(--status-loss); margin-top:2px;">10</div>
               </div>
               <div>
                 <span class="t-label">Time</span>
-                <div id="minesTimer" class="t-val" style="font-size:2rem; margin-top:2px;">0s</div>
+                <div id="minesTimer" class="t-val" style="font-size:1.6rem; margin-top:2px;">0s</div>
               </div>
             </div>
           </div>
 
-          <div class="telemetry-cell" style="gap:8px;">
-            <span class="t-label">Action Mode</span>
-            <div style="display:flex; gap:8px;">
-              <button type="button" class="btn-nav-pill" id="btnMineDig" style="flex:1; justify-content:center; border-color:var(--brand-accent);">⛏ Dig</button>
-              <button type="button" class="btn-nav-pill" id="btnMineFlag" style="flex:1; justify-content:center;">🚩 Flag</button>
+          <div class="telemetry-cell" style="gap:6px;">
+            <span class="t-label">Tap Action</span>
+            <div style="display:flex; gap:6px;">
+              <button type="button" class="btn-nav-pill" id="btnMineDig" style="flex:1; justify-content:center; border-color:var(--brand-accent);">Dig</button>
+              <button type="button" class="btn-nav-pill" id="btnMineFlag" style="flex:1; justify-content:center;">Flag</button>
             </div>
           </div>
 
-          <div class="telemetry-cell" style="padding:12px; text-align:center;">
-            <span class="t-label">Tip</span>
-            <p style="font-size:0.75rem; color:var(--text-sub); margin-top:4px; line-height:1.4;">
-              Desktop par <strong>Right-click</strong> karke seedhe flag laga sakte hain.
+          <div class="telemetry-cell" style="padding:8px 10px; text-align:center;">
+            <p style="font-size:0.75rem; color:var(--text-sub); line-height:1.35;">
+              Right-click on desktop to flag squares directly.
             </p>
           </div>
         </div>
@@ -103,7 +96,6 @@ export default {
       const r = Math.floor(Math.random() * this.rows);
       const c = Math.floor(Math.random() * this.cols);
 
-      // Pehle click aur uske aas-paas mine nahi lagayenge
       const isSafeZone = Math.abs(r - safeR) <= 1 && Math.abs(c - safeC) <= 1;
       if (!this.board[r][c].isMine && !isSafeZone) {
         this.board[r][c].isMine = true;
@@ -111,7 +103,6 @@ export default {
       }
     }
 
-    // Number of surrounding mines calculate karein
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         if (this.board[r][c].isMine) continue;
@@ -168,8 +159,8 @@ export default {
     const btnFlag = document.getElementById('btnMineFlag');
 
     if (btnDig && btnFlag) {
-      btnDig.style.borderColor = !active ? 'var(--brand-accent)' : 'var(--border-strong)';
-      btnFlag.style.borderColor = active ? 'var(--status-loss)' : 'var(--border-strong)';
+      btnDig.style.borderColor = !active ? 'var(--brand-accent)' : 'var(--border-line)';
+      btnFlag.style.borderColor = active ? 'var(--status-loss)' : 'var(--border-line)';
     }
   },
 
@@ -247,7 +238,6 @@ export default {
     this.isGameOver = true;
     if (this.timerInterval) clearInterval(this.timerInterval);
 
-    // Sabhi mines show karein
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         if (this.board[r][c].isMine) {
@@ -261,15 +251,13 @@ export default {
       this.ctx.fx.sfx.victory();
       this.ctx.recordResult('WIN', {
         score: Math.max(10, 1000 - this.timerSec * 5),
-        summary: `Mines Cleared in ${this.timerSec}s!`,
-        ranked: true
+        summary: `Cleared in ${this.timerSec}s!`
       });
     } else {
       this.ctx.fx.sfx.defeat();
       this.ctx.recordResult('LOSS', {
         score: 0,
-        summary: `Stepped on a mine after ${this.timerSec}s`,
-        ranked: true
+        summary: `Hit a mine after ${this.timerSec}s`
       });
     }
   },
@@ -279,7 +267,7 @@ export default {
     if (!grid) return;
 
     grid.innerHTML = this.board.flat().map(cell => `
-      <button type="button" class="mine-cell" data-r="${cell.r}" data-c="${cell.c}" style="width:34px; height:34px; padding:0; display:flex; align-items:center; justify-content:center; background:var(--bg-surface); border:1.5px solid var(--border-strong); border-radius:4px; font-family:'Archivo Black', sans-serif; font-size:0.85rem; font-weight:900; cursor:pointer; box-shadow:1.5px 1.5px 0px #000; user-select:none;"></button>
+      <button type="button" class="mine-cell" data-r="${cell.r}" data-c="${cell.c}" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center; background:var(--bg-surface); border:1px solid var(--border-line); border-radius:3px; font-size:0.85rem; font-weight:700; cursor:pointer; user-select:none;"></button>
     `).join('');
   },
 
@@ -289,17 +277,15 @@ export default {
     if (!el) return;
 
     if (cell.isRevealed) {
-      el.style.boxShadow = 'none';
-      el.style.transform = 'translate(1px, 1px)';
-
       if (cell.isMine) {
         el.style.background = 'var(--status-loss)';
-        el.textContent = '💣';
+        el.style.color = '#ffffff';
+        el.textContent = '*';
       } else {
         el.style.background = 'var(--bg-panel)';
         el.style.borderColor = 'var(--border-line)';
         if (cell.neighborMines > 0) {
-          const colors = ['', '#00f0ff', '#00e575', '#ffb703', '#1E88E5', '#ff2a5f', '#7209b7', '#000000', '#657185'];
+          const colors = ['', '#2f81f7', '#2ea043', '#d29922', '#1f6feb', '#f85149', '#8250df', '#30363d', '#6e7681'];
           el.style.color = colors[cell.neighborMines] || '#ffffff';
           el.textContent = cell.neighborMines;
         } else {
@@ -308,9 +294,8 @@ export default {
       }
     } else {
       el.style.background = 'var(--bg-surface)';
-      el.style.boxShadow = '1.5px 1.5px 0px #000';
-      el.style.transform = 'none';
-      el.textContent = cell.isFlagged ? '🚩' : '';
+      el.style.color = 'var(--status-loss)';
+      el.textContent = cell.isFlagged ? 'P' : '';
     }
   },
 

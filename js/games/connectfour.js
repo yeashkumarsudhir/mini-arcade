@@ -1,24 +1,18 @@
-/**
- * js/games/connectfour.js
- * Connect 4 — Four in a Line Tactile Cabinet Board
- * Features: 7x6 matrix, physical gravity disc drop, smart bot logic, 2P local mode
- */
-
 export default {
   id: 'connectfour',
   title: 'Connect 4',
-  accent: '#ff2a5f',
+  accent: '#f85149',
 
   ctx: null,
   container: null,
 
   cols: 7,
   rows: 6,
-  board: [], // 2D array [row][col]: null | 'RED' | 'YELLOW'
-  currentPlayer: 'RED', // Player is RED, Bot/P2 is YELLOW
+  board: [],
+  currentPlayer: 'RED',
   isLocked: false,
   isGameOver: false,
-  mode: 'VS_BOT', // 'VS_BOT' | '2P_LOCAL'
+  mode: 'VS_BOT',
   seriesScore: { red: 0, yellow: 0, ties: 0 },
 
   mount(el, sessionCtx) {
@@ -27,64 +21,57 @@ export default {
 
     this.container.innerHTML = `
       <div class="arena-dual-layout">
-        <!-- Physical Vertical Connect 4 Stand -->
-        <div class="arena-board-frame" style="flex-direction:column; align-items:stretch; width:min(calc(100vw - 24px), 440px); padding:12px; background:#142340; border:3px solid #000; border-radius:12px; box-shadow:var(--shadow-offset-lg);">
-          <!-- Top Column Drop Buttons -->
-          <div id="c4DropArrows" style="display:grid; grid-template-columns:repeat(7, 1fr); gap:6px; margin-bottom:8px; width:100%;">
+        <div class="arena-board-frame" style="flex-direction:column; align-items:stretch; width:min(calc(100vw - 24px), 420px); padding:10px; background:#161b22; border:1px solid var(--border-line); border-radius:8px;">
+          <div id="c4DropArrows" style="display:grid; grid-template-columns:repeat(7, 1fr); gap:6px; margin-bottom:6px; width:100%;">
             ${Array(7).fill(0).map((_, i) => `
-              <button type="button" class="btn-nav-pill c4-drop-btn" data-col="${i}" style="height:36px; min-width:0; padding:0; justify-content:center; font-size:1.1rem; border-color:var(--status-loss);" aria-label="Drop in column ${i + 1}">▼</button>
+              <button type="button" class="btn-nav-pill c4-drop-btn" data-col="${i}" style="height:32px; min-width:0; padding:0; justify-content:center; font-size:0.9rem;" aria-label="Drop column ${i + 1}">▼</button>
             `).join('')}
           </div>
 
-          <!-- 7x6 Slotted Grid Board -->
-          <div id="c4GridWrapper" style="display:grid; grid-template-columns:repeat(7, 1fr); grid-template-rows:repeat(6, 1fr); gap:6px; width:100%; aspect-ratio:7 / 6; background:#1b356b; padding:8px; border-radius:8px; border:2px solid #000; box-shadow:inset 0 4px 10px rgba(0,0,0,0.5);">
+          <div id="c4GridWrapper" style="display:grid; grid-template-columns:repeat(7, 1fr); grid-template-rows:repeat(6, 1fr); gap:6px; width:100%; aspect-ratio:7 / 6; background:#1f3a60; padding:8px; border-radius:6px; border:1px solid var(--border-line);">
             ${Array(42).fill(0).map((_, i) => {
               const r = Math.floor(i / 7);
               const c = i % 7;
               return `
-                <div class="c4-slot" data-r="${r}" data-c="${c}" style="position:relative; width:100%; height:100%; min-width:0; border-radius:50%; background:#0a0d14; border:2px solid #000; overflow:hidden; box-shadow:inset 0 4px 6px rgba(0,0,0,0.7); cursor:pointer;">
-                  <div class="c4-disc" style="position:absolute; inset:0; border-radius:50%; transform:translateY(-120%); transition:transform 0.22s cubic-bezier(0.3, 0, 0.2, 1);"></div>
+                <div class="c4-slot" data-r="${r}" data-c="${c}" style="position:relative; width:100%; height:100%; border-radius:50%; background:#0e1117; overflow:hidden; cursor:pointer;">
+                  <div class="c4-disc" style="position:absolute; inset:0; border-radius:50%; transform:translateY(-120%); transition:transform 0.2s ease-out;"></div>
                 </div>
               `;
             }).join('')}
           </div>
         </div>
 
-        <!-- Right Side Control Deck -->
         <div class="arena-side-controls">
-          <!-- Turn Status Readout -->
-          <div class="telemetry-cell" style="text-align:center; padding:16px;">
+          <div class="telemetry-cell" style="text-align:center; padding:12px;">
             <span class="t-label">Turn</span>
-            <div id="c4TurnStatus" class="t-val" style="font-size:1.3rem; margin:4px 0; color:var(--status-loss);">
+            <div id="c4TurnStatus" class="t-val" style="font-size:1.15rem; margin:2px 0; color:var(--status-loss);">
               Your turn (Red)
             </div>
-            <div id="c4SubStatus" style="font-size:0.75rem; color:var(--text-dim); font-weight:600;">
+            <div id="c4SubStatus" style="font-size:0.75rem; color:var(--text-dim);">
               Pick a column to drop
             </div>
           </div>
 
-          <!-- Series Scoreboard Card -->
-          <div class="telemetry-cell" style="padding:14px;">
-            <span class="t-label" style="text-align:center; margin-bottom:8px;">Series Score</span>
-            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; text-align:center;">
+          <div class="telemetry-cell" style="padding:10px;">
+            <span class="t-label" style="text-align:center; margin-bottom:6px;">Score</span>
+            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; text-align:center;">
               <div>
-                <div style="font-size:0.65rem; color:var(--text-sub); font-weight:800;">RED</div>
-                <div id="c4ScoreRed" class="t-val" style="font-size:1.4rem; color:var(--status-loss);">0</div>
+                <div style="font-size:0.7rem; color:var(--text-sub); font-weight:600;">RED</div>
+                <div id="c4ScoreRed" class="t-val" style="font-size:1.2rem; color:var(--status-loss);">0</div>
               </div>
               <div>
-                <div style="font-size:0.65rem; color:var(--text-sub); font-weight:800;">DRAWS</div>
-                <div id="c4ScoreTies" class="t-val" style="font-size:1.4rem; color:var(--text-main);">0</div>
+                <div style="font-size:0.7rem; color:var(--text-sub); font-weight:600;">DRAW</div>
+                <div id="c4ScoreTies" class="t-val" style="font-size:1.2rem; color:var(--text-main);">0</div>
               </div>
               <div>
-                <div style="font-size:0.65rem; color:var(--text-sub); font-weight:800;">YELLOW</div>
-                <div id="c4ScoreYellow" class="t-val" style="font-size:1.4rem; color:var(--status-coin);">0</div>
+                <div style="font-size:0.7rem; color:var(--text-sub); font-weight:600;">YELLOW</div>
+                <div id="c4ScoreYellow" class="t-val" style="font-size:1.2rem; color:var(--status-coin);">0</div>
               </div>
             </div>
           </div>
 
-          <!-- Mode Selector -->
-          <div class="telemetry-cell" style="gap:8px;">
-            <span class="t-label">Opponent</span>
+          <div class="telemetry-cell" style="gap:6px;">
+            <span class="t-label">Mode</span>
             <div style="display:flex; gap:6px;">
               <button type="button" class="btn-nav-pill" id="btnC4VsBot" style="flex:1; justify-content:center; border-color:var(--brand-accent);">vs Bot</button>
               <button type="button" class="btn-nav-pill" id="btnC4VsPlayer" style="flex:1; justify-content:center;">2-Player</button>
@@ -114,8 +101,8 @@ export default {
     const btnBot = document.getElementById('btnC4VsBot');
     const btnPlayer = document.getElementById('btnC4VsPlayer');
     if (btnBot && btnPlayer) {
-      btnBot.style.borderColor = (m === 'VS_BOT') ? 'var(--brand-accent)' : 'var(--border-strong)';
-      btnPlayer.style.borderColor = (m === '2P_LOCAL') ? 'var(--brand-accent)' : 'var(--border-strong)';
+      btnBot.style.borderColor = (m === 'VS_BOT') ? 'var(--brand-accent)' : 'var(--border-line)';
+      btnPlayer.style.borderColor = (m === '2P_LOCAL') ? 'var(--brand-accent)' : 'var(--border-line)';
     }
   },
 
@@ -155,7 +142,7 @@ export default {
 
   dropDisc(col) {
     const row = this.findLowestEmptyRow(col);
-    if (row === -1) return; // Column full
+    if (row === -1) return;
 
     this.isLocked = true;
     this.board[row][col] = this.currentPlayer;
@@ -174,7 +161,6 @@ export default {
       return;
     }
 
-    // Next turn
     this.currentPlayer = (this.currentPlayer === 'RED') ? 'YELLOW' : 'RED';
     this.updateStatus();
 
@@ -187,13 +173,13 @@ export default {
 
   triggerBotTurn() {
     const sub = document.getElementById('c4SubStatus');
-    if (sub) sub.textContent = 'Bot is calculating drop...';
+    if (sub) sub.textContent = 'Bot is thinking...';
 
     setTimeout(() => {
       if (this.isGameOver) return;
       const col = this.computeBotMove();
       this.dropDisc(col);
-    }, 450);
+    }, 400);
   },
 
   computeBotMove() {
@@ -202,7 +188,6 @@ export default {
       if (this.findLowestEmptyRow(c) !== -1) validCols.push(c);
     }
 
-    // 1. Check if Bot can win on next move
     for (const c of validCols) {
       const r = this.findLowestEmptyRow(c);
       this.board[r][c] = 'YELLOW';
@@ -211,7 +196,6 @@ export default {
       if (win) return c;
     }
 
-    // 2. Block Player from winning on next move
     for (const c of validCols) {
       const r = this.findLowestEmptyRow(c);
       this.board[r][c] = 'RED';
@@ -220,18 +204,16 @@ export default {
       if (win) return c;
     }
 
-    // 3. Center column preference
     if (validCols.includes(3)) return 3;
-
     return validCols[Math.floor(Math.random() * validCols.length)];
   },
 
   checkWin(b, r, c, player) {
     const directions = [
-      [[0, 1], [0, -1]],  // Horizontal
-      [[1, 0], [-1, 0]],  // Vertical
-      [[1, 1], [-1, -1]], // Diagonal \
-      [[1, -1], [-1, 1]]  // Diagonal /
+      [[0, 1], [0, -1]],
+      [[1, 0], [-1, 0]],
+      [[1, 1], [-1, -1]],
+      [[1, -1], [-1, 1]]
     ];
 
     for (const [dir1, dir2] of directions) {
@@ -263,15 +245,14 @@ export default {
 
     if (result === 'DRAW') {
       this.seriesScore.ties++;
-      this.ctx.fx.playTone(330, 'triangle', 0.15, 0.12);
-      this.ctx.recordResult('DRAW', { summary: 'Match Draw', ranked: this.mode === 'VS_BOT' });
+      this.ctx.fx.playTone(330, 'triangle', 0.12, 0.1);
+      this.ctx.recordResult('DRAW', { summary: 'Match Draw' });
     } else {
       if (winLine) {
         winLine.forEach(({ r, c }) => {
           const slot = document.querySelector(`.c4-slot[data-r="${r}"][data-c="${c}"]`);
           if (slot) {
-            slot.style.border = '2px solid #ffffff';
-            slot.style.boxShadow = '0 0 10px #ffffff';
+            slot.style.outline = '2px solid #ffffff';
           }
         });
       }
@@ -279,11 +260,11 @@ export default {
       if (result === 'RED') {
         this.seriesScore.red++;
         this.ctx.fx.sfx.victory();
-        this.ctx.recordResult('WIN', { summary: 'Player Won Connect 4!', ranked: this.mode === 'VS_BOT' });
+        this.ctx.recordResult('WIN', { summary: 'Player Won Connect 4!' });
       } else {
         this.seriesScore.yellow++;
         this.ctx.fx.sfx.defeat();
-        this.ctx.recordResult('LOSS', { summary: 'Bot Won Connect 4', ranked: this.mode === 'VS_BOT' });
+        this.ctx.recordResult('LOSS', { summary: 'Bot Won Connect 4' });
       }
     }
 
@@ -291,7 +272,7 @@ export default {
 
     setTimeout(() => {
       this.start({ mode: this.mode });
-    }, 2500);
+    }, 2200);
   },
 
   renderDisc(r, c, player) {
@@ -300,17 +281,14 @@ export default {
 
     const disc = slot.querySelector('.c4-disc');
     if (disc) {
-      disc.style.background = (player === 'RED') ? '#ff2a5f' : '#ffb703';
-      disc.style.border = '2px solid #000';
-      disc.style.boxShadow = 'inset 0 -3px 0 rgba(0,0,0,0.4)';
+      disc.style.background = (player === 'RED') ? '#f85149' : '#d29922';
       disc.style.transform = 'translateY(0%)';
     }
   },
 
   resetBoardVisuals() {
     document.querySelectorAll('.c4-slot').forEach(slot => {
-      slot.style.border = '2px solid #000';
-      slot.style.boxShadow = 'inset 0 4px 6px rgba(0,0,0,0.7)';
+      slot.style.outline = 'none';
       const disc = slot.querySelector('.c4-disc');
       if (disc) {
         disc.style.transform = 'translateY(-120%)';
@@ -329,7 +307,7 @@ export default {
 
     if (this.mode === 'VS_BOT') {
       label.textContent = (this.currentPlayer === 'RED') ? 'Your turn (Red)' : 'Bot turn (Yellow)';
-      if (sub) sub.textContent = (this.currentPlayer === 'RED') ? 'Pick a column to drop' : 'Bot is calculating...';
+      if (sub) sub.textContent = (this.currentPlayer === 'RED') ? 'Pick a column to drop' : 'Bot is thinking...';
     } else {
       label.textContent = (this.currentPlayer === 'RED') ? 'Player 1 (Red)' : 'Player 2 (Yellow)';
       if (sub) sub.textContent = 'Pass to player ' + (this.currentPlayer === 'RED' ? '1' : '2');

@@ -1,7 +1,3 @@
-/**
- * js/core/haptics.js
- * Hardware Vibration Adapter with Settings Guard
- */
 import { SettingsStore } from './store.js';
 
 export const Haptics = {

@@ -1,13 +1,7 @@
-/**
- * js/games/twentyfortyeight.js
- * 2048 — Tactile Sliding Tile Puzzle
- * Features: 4x4 grid, arrow/WASD/touch swipe, smooth sliding math, merge sound
- */
-
 export default {
   id: 'twentyfortyeight',
   title: '2048',
-  accent: '#ffb703',
+  accent: '#d29922',
 
   ctx: null,
   container: null,
@@ -25,21 +19,21 @@ export default {
 
     this.container.innerHTML = `
       <div class="arena-dual-layout">
-        <div class="arena-board-frame" style="padding:16px; background:var(--bg-panel); border:2px solid var(--border-strong); border-radius:var(--radius-card); box-shadow:var(--shadow-offset-lg);">
-          <div id="grid2048" style="display:grid; grid-template-columns:repeat(4, 1fr); grid-template-rows:repeat(4, 1fr); gap:8px; width:min(calc(100vw - 72px), 340px); aspect-ratio:1; touch-action:none; background:var(--bg-base); padding:8px; border-radius:8px; border:2px solid var(--border-strong);"></div>
+        <div class="arena-board-frame" style="padding:10px; background:var(--bg-panel); border:1px solid var(--border-line); border-radius:8px;">
+          <div id="grid2048" style="display:grid; grid-template-columns:repeat(4, 1fr); grid-template-rows:repeat(4, 1fr); gap:6px; width:min(calc(100vw - 48px), 320px); aspect-ratio:1; touch-action:none; background:var(--bg-base); padding:6px; border-radius:6px; border:1px solid var(--border-line);"></div>
         </div>
 
         <div class="arena-side-controls">
-          <div class="telemetry-cell" style="text-align:center; padding:16px;">
-            <span class="t-label">Current Score</span>
-            <div id="score2048" class="t-val" style="font-size:2.4rem; color:var(--status-coin); margin:4px 0;">0</div>
-            <div id="best2048" style="font-size:0.8rem; color:var(--text-dim); font-weight:700;">Best: 0</div>
+          <div class="telemetry-cell" style="text-align:center; padding:12px;">
+            <span class="t-label">Score</span>
+            <div id="score2048" class="t-val" style="font-size:2rem; color:var(--status-coin); margin:2px 0;">0</div>
+            <div id="best2048" style="font-size:0.75rem; color:var(--text-dim);">Best: 0</div>
           </div>
 
-          <div class="telemetry-cell" style="padding:14px; text-align:center;">
-            <span class="t-label">Controls</span>
-            <p style="font-size:0.8rem; color:var(--text-sub); margin-top:4px; line-height:1.4;">
-              Use <strong>Arrow Keys</strong>, <strong>WASD</strong>, or <strong>Swipe</strong> to merge identical numbers. Reach <strong>2048</strong> to win!
+          <div class="telemetry-cell" style="padding:10px; text-align:center;">
+            <span class="t-label">How to play</span>
+            <p style="font-size:0.75rem; color:var(--text-sub); margin-top:4px; line-height:1.4;">
+              Swipe or use Arrow keys / WASD to slide matching numbers together. Combine them until you reach 2048.
             </p>
           </div>
         </div>
@@ -96,7 +90,6 @@ export default {
     };
     window.addEventListener('keydown', this.keyHandler);
 
-    // Touch Swipe Support
     let startX = 0, startY = 0;
     const boardEl = document.getElementById('grid2048');
 
@@ -164,19 +157,19 @@ export default {
   },
 
   handlePostMove() {
-    this.ctx.fx.playTone(420, 'triangle', 0.03, 0.1);
+    this.ctx.fx.playTone(420, 'triangle', 0.03, 0.08);
     this.spawnTile();
     this.renderBoard();
     this.updateStats();
 
     if (this.hasWon) {
       this.ctx.fx.sfx.victory();
-      this.ctx.recordResult('WIN', { score: this.score, summary: `Reached 2048! (Score: ${this.score})`, ranked: true });
+      this.ctx.recordResult('WIN', { score: this.score, summary: `Reached 2048! (Score: ${this.score})` });
       this.hasWon = false;
     } else if (this.checkGameOver()) {
       this.isGameOver = true;
       this.ctx.fx.sfx.defeat();
-      this.ctx.recordResult('LOSS', { score: this.score, summary: `No moves left (Score: ${this.score})`, ranked: true });
+      this.ctx.recordResult('LOSS', { score: this.score, summary: `No moves left (Score: ${this.score})` });
     }
   },
 
@@ -197,26 +190,26 @@ export default {
 
     const colorMap = {
       0: { bg: 'var(--bg-surface)', fg: 'transparent' },
-      2: { bg: '#e8ecf4', fg: '#141712' },
-      4: { bg: '#dbe2ee', fg: '#141712' },
-      8: { bg: '#ffb703', fg: '#000000' },
-      16: { bg: '#fb8500', fg: '#000000' },
-      32: { bg: '#f72585', fg: '#ffffff' },
-      64: { bg: '#ff2a5f', fg: '#ffffff' },
-      128: { bg: '#00e575', fg: '#000000' },
-      256: { bg: '#00f0ff', fg: '#000000' },
-      512: { bg: '#4361ee', fg: '#ffffff' },
-      1024: { bg: '#7209b7', fg: '#ffffff' },
-      2048: { bg: '#ffea00', fg: '#000000' }
+      2: { bg: '#21262d', fg: 'var(--text-main)' },
+      4: { bg: '#30363d', fg: 'var(--text-main)' },
+      8: { bg: '#8c5b00', fg: '#ffffff' },
+      16: { bg: '#a35200', fg: '#ffffff' },
+      32: { bg: '#b3261e', fg: '#ffffff' },
+      64: { bg: '#cf222e', fg: '#ffffff' },
+      128: { bg: '#1a7f37', fg: '#ffffff' },
+      256: { bg: '#0969da', fg: '#ffffff' },
+      512: { bg: '#2f81f7', fg: '#ffffff' },
+      1024: { bg: '#8250df', fg: '#ffffff' },
+      2048: { bg: '#d29922', fg: '#000000' }
     };
 
     el.innerHTML = this.board.flat().map(val => {
-      const palette = colorMap[val] || { bg: '#3a0ca3', fg: '#ffffff' };
+      const palette = colorMap[val] || { bg: '#8250df', fg: '#ffffff' };
       const displayVal = val === 0 ? '' : val;
-      const fontSize = val >= 1000 ? '1.25rem' : '1.5rem';
+      const fontSize = val >= 1000 ? '1.1rem' : '1.3rem';
 
       return `
-        <div style="background:${palette.bg}; color:${palette.fg}; display:flex; align-items:center; justify-content:center; font-family:'Archivo Black', sans-serif; font-size:${fontSize}; font-weight:900; border-radius:6px; border:2px solid var(--border-strong); box-shadow:2px 2px 0px #000; user-select:none;">
+        <div style="background:${palette.bg}; color:${palette.fg}; display:flex; align-items:center; justify-content:center; font-size:${fontSize}; font-weight:700; border-radius:4px; border:1px solid var(--border-line); user-select:none;">
           ${displayVal}
         </div>
       `;

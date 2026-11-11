@@ -1,10 +1,3 @@
-/**
- * js/games/ludo.js
- * Classic Physical Ludo Orchestrator & Game State Machine
- * Real Paper Board, Moulded Plastic Pawns & 3D Ivory Tumbling Dice
- * Enhanced with Ludo-King Style Custom Player / Bot Lobby
- */
-
 import { LudoRules, LUDO_COLORS, LUDO_PALETTE } from './ludo-rules.js';
 import { LudoAI } from './ludo-ai.js';
 import { LudoRenderer } from './ludo-render.js';
@@ -82,7 +75,7 @@ class SafeScheduler {
 
 export const LudoGame = {
   id: 'ludo',
-  title: 'Ludo Royale',
+  title: 'Ludo',
   accent: '#E53935',
 
   container: null,
@@ -91,17 +84,15 @@ export const LudoGame = {
   scheduler: new SafeScheduler(),
   resizeObserver: null,
 
-  fsm: 'LOBBY',
+  fsm: 'WAIT_ROLL',
 
   activeColor: 'RED',
   humanColor: 'RED',
   mode: 'CUSTOM',
   difficulty: 'Normal',
-  pace: 'NORMAL',
-  hopMs: 150,
+  hopMs: 140,
 
   autoMoveSingle: true,
-  perspectiveView: false,
   colorBlindAssist: false,
 
   diceValue: 1,
@@ -137,7 +128,6 @@ export const LudoGame = {
 
   animatingHop: null,
   rAFId: null,
-  lastFrameTime: 0,
   matchEndedCalled: false,
 
   mount(el) {
@@ -146,34 +136,27 @@ export const LudoGame = {
     this.scheduler = new SafeScheduler();
 
     this.container.innerHTML = `
-      <div class="ludo-tabletop-container" id="ludoTableContainer" style="display:flex; flex-direction:column; align-items:center; width:100%; max-width:600px; margin:0 auto; gap:12px;">
-        
-        <!-- Physical Board Viewport -->
+      <div class="ludo-tabletop-container" id="ludoTableContainer" style="display:flex; flex-direction:column; align-items:center; width:100%; max-width:540px; margin:0 auto; gap:8px;">
         <div class="ludo-board-frame" id="ludoBoardFrame" style="width:100%; display:flex; justify-content:center;">
-          <canvas id="ludoCanvas" width="540" height="540" style="max-width:100%; height:auto; touch-action:none; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.25);"></canvas>
+          <canvas id="ludoCanvas" width="540" height="540" style="max-width:100%; height:auto; touch-action:none; border-radius:6px;"></canvas>
         </div>
 
-        <!-- Cabinet Side Deck Controls -->
-        <div class="ludo-deck-controls" style="width:100%; display:flex; flex-direction:column; gap:10px;">
-          <!-- Active Player Card Slots -->
+        <div class="ludo-deck-controls" style="width:100%; display:flex; flex-direction:column; gap:8px;">
           <div class="ludo-players-grid" id="ludoPlayerSlots" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(110px, 1fr)); gap:6px;"></div>
 
-          <!-- Turn Status Readout -->
-          <div class="telemetry-cell" style="text-align:center; padding:10px 12px; background:var(--bg-surface, #fff); border:2px solid var(--border-strong, #141712); border-radius:10px;">
-            <div id="ludoStatusLine" class="t-val" style="font-size:1.1rem; font-weight:800; color:var(--ludo-red, #E53935); margin:0;" aria-live="polite">
-              Starting Match...
+          <div style="text-align:center; padding:8px 10px; background:var(--bg-surface); border:1px solid var(--border-line); border-radius:6px;">
+            <div id="ludoStatusLine" style="font-size:1rem; font-weight:700; color:var(--ludo-red, #E53935);" aria-live="polite">
+              Starting match...
             </div>
-            <div id="ludoSubNotice" style="font-size:0.75rem; color:var(--text-dim, #666); margin-top:4px; font-weight:600;">
-              Tap Roll Dice or press SPACE
+            <div id="ludoSubNotice" style="font-size:0.75rem; color:var(--text-dim); margin-top:2px;">
+              Roll the dice or press Space
             </div>
           </div>
 
-          <!-- Interactive Dice Tray -->
-          <div class="ludo-dice-tray" id="ludoDiceTray" style="background:var(--bg-surface, #fff); border:2px solid var(--border-strong, #141712); border-radius:12px; padding:12px; display:flex; flex-direction:column; align-items:center; gap:8px;">
-            <div class="ludo-roll-again-badge" id="ludoRollAgainBadge">ROLL AGAIN!</div>
+          <div class="ludo-dice-tray" id="ludoDiceTray">
+            <div class="ludo-roll-again-badge" id="ludoRollAgainBadge">ROLL AGAIN</div>
 
-            <!-- Visual Dice Target -->
-            <div class="ludo-dice-viewport" id="ludoDiceViewport" role="button" tabindex="0" aria-label="Roll Dice" style="width:68px; height:68px; cursor:pointer;">
+            <div class="ludo-dice-viewport" id="ludoDiceViewport" role="button" tabindex="0" aria-label="Roll Dice">
               <div class="ludo-dice-shadow" id="ludoDiceShadow"></div>
               <div class="ludo-dice-cube" id="ludoDiceCube">
                 <div class="ludo-dice-face face-1"><span class="ludo-pip red-pip"></span></div>
@@ -186,55 +169,48 @@ export const LudoGame = {
             </div>
 
             <div style="display:flex; width:100%; gap:8px;">
-              <button type="button" class="btn-cta-primary" id="btnRollDiceDirect" style="flex:2; height:42px; font-size:0.85rem; font-weight:800;">
+              <button type="button" class="btn-cta-primary" id="btnRollDiceDirect" style="flex:2; height:40px; font-size:0.85rem; font-weight:600;">
                 Roll Dice (Space)
               </button>
-              <button type="button" id="btnOpenLobbyModal" class="btn-cta-secondary" style="flex:1; height:42px; font-size:0.75rem; font-weight:700; border:2px solid var(--border-strong, #000); border-radius:6px; cursor:pointer;">
-                ⚙️ Setup
+              <button type="button" id="btnOpenLobbyModal" class="btn-cta-secondary show" style="flex:1; height:40px; font-size:0.8rem; font-weight:600; cursor:pointer;">
+                Setup
               </button>
             </div>
           </div>
 
-          <!-- Quick Switches -->
-          <div class="telemetry-cell" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:var(--bg-surface, #fff); border:1.5px solid var(--border-strong, #ccc); border-radius:8px;">
-            <label style="display:flex; align-items:center; gap:6px; font-size:0.75rem; font-weight:700; cursor:pointer;">
-              <input type="checkbox" id="chkAutoMove" checked> Auto-move
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:var(--bg-surface); border:1px solid var(--border-line); border-radius:6px;">
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.75rem; cursor:pointer;">
+              <input type="checkbox" id="chkAutoMove" checked> Auto-move single
             </label>
-            <label style="display:flex; align-items:center; gap:6px; font-size:0.75rem; font-weight:700; cursor:pointer;">
-              <input type="checkbox" id="chkColorBlind"> Numbers
-            </label>
-            <label style="display:flex; align-items:center; gap:6px; font-size:0.75rem; font-weight:700; cursor:pointer;">
-              <input type="checkbox" id="chkTableTilt"> Tilt 3D
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.75rem; cursor:pointer;">
+              <input type="checkbox" id="chkColorBlind"> Numbers on pawns
             </label>
           </div>
         </div>
 
-        <!-- Ludo King Style Match Setup Modal -->
-        <div id="ludoLobbyModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center; padding:16px;">
-          <div style="background:var(--bg-surface, #fff); border:3px solid var(--border-strong, #000); border-radius:12px; max-width:420px; width:100%; padding:20px; box-shadow:4px 4px 0px #000; display:flex; flex-direction:column; gap:16px;">
+        <div id="ludoLobbyModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:9999; justify-content:center; align-items:center; padding:16px;">
+          <div style="background:var(--bg-panel); border:1px solid var(--border-line); border-radius:8px; max-width:400px; width:100%; padding:16px; display:flex; flex-direction:column; gap:12px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-              <h3 style="margin:0; font-family:'Archivo Black', sans-serif; font-size:1.15rem;">🎲 Ludo Match Setup</h3>
-              <button type="button" id="btnCloseLobbyModal" style="background:none; border:none; font-size:1.4rem; cursor:pointer; line-height:1;">&times;</button>
+              <h3 style="margin:0; font-size:1rem; font-weight:700;">Match Setup</h3>
+              <button type="button" id="btnCloseLobbyModal" style="background:none; border:none; font-size:1.3rem; cursor:pointer; color:var(--text-main);">&times;</button>
             </div>
 
-            <!-- Player Count Selector -->
             <div>
-              <span class="ludo-opt-group-label" style="display:block; font-size:0.75rem; font-weight:800; text-transform:uppercase; color:var(--text-dim, #666); margin-bottom:6px;">Select Players</span>
-              <div class="ludo-pill-selector" id="ludoPlayerCountPills" style="display:flex; gap:8px;">
+              <span style="display:block; font-size:0.75rem; font-weight:700; color:var(--text-sub); margin-bottom:6px;">Players</span>
+              <div class="ludo-pill-selector" id="ludoPlayerCountPills">
                 <button type="button" class="ludo-pill-btn" data-count="2">2 Players</button>
                 <button type="button" class="ludo-pill-btn" data-count="3">3 Players</button>
                 <button type="button" class="ludo-pill-btn active" data-count="4">4 Players</button>
               </div>
             </div>
 
-            <!-- Seat Customization Grid -->
             <div>
-              <span class="ludo-opt-group-label" style="display:block; font-size:0.75rem; font-weight:800; text-transform:uppercase; color:var(--text-dim, #666); margin-bottom:6px;">Seats (Human vs Bot)</span>
-              <div id="ludoSeatsContainer" class="ludo-seat-config-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;"></div>
+              <span style="display:block; font-size:0.75rem; font-weight:700; color:var(--text-sub); margin-bottom:6px;">Seats</span>
+              <div id="ludoSeatsContainer" style="display:grid; grid-template-columns:1fr 1fr; gap:6px;"></div>
             </div>
 
-            <button type="button" class="btn-cta-primary" id="btnStartLobbyGame" style="height:44px; width:100%; font-size:0.9rem; font-weight:900;">
-              START MATCH
+            <button type="button" class="btn-cta-primary" id="btnStartLobbyGame" style="height:40px; width:100%; font-size:0.85rem; font-weight:600;">
+              Start Match
             </button>
           </div>
         </div>
@@ -243,7 +219,6 @@ export const LudoGame = {
 
     this.canvas = document.getElementById('ludoCanvas');
     this.renderer = new LudoRenderer(this.canvas);
-
     window.LudoGameInstance = this;
 
     this.bindEvents();
@@ -255,9 +230,20 @@ export const LudoGame = {
     this.matchEndedCalled = false;
     this.consecutiveSixes = 0;
     this.fsm = 'WAIT_ROLL';
+    this.isRolling = false;
     this.animatingHop = null;
     this.legalMoves = [];
     this.selectedTokenIdx = null;
+
+    if (opts.resumeSave && this.loadSavedState()) {
+      this.renderPlayerSlots();
+      this.syncUI();
+      this.setDiceFace(this.diceValue || 1);
+      if (this.getCurrentPlayer().isBot) {
+        this.scheduler.after(500, () => this.triggerBotCycle());
+      }
+      return;
+    }
 
     if (opts.customPlayers && Array.isArray(opts.customPlayers)) {
       this.players = opts.customPlayers;
@@ -285,6 +271,43 @@ export const LudoGame = {
 
     if (this.getCurrentPlayer().isBot) {
       this.scheduler.after(500, () => this.triggerBotCycle());
+    }
+  },
+
+  saveState() {
+    try {
+      const payload = {
+        state: this.state,
+        activeColor: this.activeColor,
+        diceValue: this.diceValue,
+        consecutiveSixes: this.consecutiveSixes,
+        players: this.players,
+        humanColor: this.humanColor,
+        difficulty: this.difficulty,
+        lobbyConfig: this.lobbyConfig
+      };
+      localStorage.setItem('parlour_ludo_autosave', JSON.stringify(payload));
+    } catch {}
+  },
+
+  loadSavedState() {
+    try {
+      const raw = localStorage.getItem('parlour_ludo_autosave');
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      if (!parsed || !parsed.state || !parsed.players) return false;
+
+      this.state = parsed.state;
+      this.activeColor = parsed.activeColor || 'RED';
+      this.diceValue = parsed.diceValue || 1;
+      this.consecutiveSixes = parsed.consecutiveSixes || 0;
+      this.players = parsed.players;
+      this.humanColor = parsed.humanColor || 'RED';
+      this.difficulty = parsed.difficulty || 'Normal';
+      if (parsed.lobbyConfig) this.lobbyConfig = parsed.lobbyConfig;
+      return true;
+    } catch {
+      return false;
     }
   },
 
@@ -316,13 +339,13 @@ export const LudoGame = {
     container.innerHTML = this.lobbyConfig.seats.map((seat) => {
       const paletteColor = LUDO_PALETTE[seat.color];
       return `
-        <div class="ludo-seat-card ${seat.active ? '' : 'disabled'}" style="border-left: 4px solid ${paletteColor}; padding:6px 8px; background:var(--bg-card, #f9f9f9); border:1px solid #ddd; border-left:5px solid ${paletteColor}; border-radius:6px; opacity:${seat.active ? '1' : '0.4'};">
+        <div class="ludo-seat-card" style="padding:6px 8px; background:var(--bg-surface); border:1px solid var(--border-line); border-left:4px solid ${paletteColor}; border-radius:4px; opacity:${seat.active ? '1' : '0.4'};">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-            <strong style="color:${paletteColor}; font-size:0.8rem;">${seat.color}</strong>
-            <span style="font-size:0.65rem; color:#666;">${seat.active ? 'Active' : 'Off'}</span>
+            <strong style="color:${paletteColor}; font-size:0.75rem;">${seat.color}</strong>
+            <span style="font-size:0.65rem; color:var(--text-dim);">${seat.active ? 'Active' : 'Off'}</span>
           </div>
-          <button type="button" class="btn-seat-toggle" data-color="${seat.color}" ${!seat.active ? 'disabled' : ''} style="width:100%; font-size:0.75rem; padding:4px 6px; border:1px solid #444; border-radius:4px; cursor:pointer; background:${seat.isBot ? '#f0f0f0' : '#4CAF50'}; color:${seat.isBot ? '#333' : '#fff'}; font-weight:700;">
-            ${seat.isBot ? '🤖 Bot (AI)' : '👤 Human'}
+          <button type="button" class="btn-seat-toggle" data-color="${seat.color}" ${!seat.active ? 'disabled' : ''} style="width:100%; font-size:0.75rem; padding:4px; border:1px solid var(--border-line); border-radius:4px; cursor:pointer; background:${seat.isBot ? 'var(--bg-panel)' : 'var(--brand-accent)'}; color:${seat.isBot ? 'var(--text-main)' : '#fff'}; font-weight:600;">
+            ${seat.isBot ? 'Bot (AI)' : 'Human'}
           </button>
         </div>
       `;
@@ -347,7 +370,7 @@ export const LudoGame = {
       this.lobbyConfig.seats = [
         { color: 'RED', active: true, isBot: false, name: 'P1 Red' },
         { color: 'GREEN', active: false, isBot: true, name: 'Bot' },
-        { color: 'YELLOW', active: true, isBot: true, name: 'P2 / Bot' },
+        { color: 'YELLOW', active: true, isBot: true, name: 'P2 Yellow' },
         { color: 'BLUE', active: false, isBot: true, name: 'Bot' }
       ];
     } else if (count === 3) {
@@ -367,7 +390,7 @@ export const LudoGame = {
     }
 
     document.querySelectorAll('#ludoPlayerCountPills .ludo-pill-btn').forEach(btn => {
-      btn.classList.toggle('active', parseInt(btn.dataset.count) === count);
+      btn.classList.toggle('active', parseInt(btn.dataset.count, 10) === count);
     });
 
     this.renderLobbySeats();
@@ -380,6 +403,7 @@ export const LudoGame = {
   bindEvents() {
     const handleRollTrigger = (e) => {
       e?.preventDefault();
+      // Strict guard against double-taps and bot roll races
       if (this.fsm === 'WAIT_ROLL' && !this.getCurrentPlayer().isBot && !this.isRolling) {
         this.executeRoll();
       }
@@ -393,7 +417,7 @@ export const LudoGame = {
 
     document.querySelectorAll('#ludoPlayerCountPills .ludo-pill-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        this.setPlayerCount(parseInt(e.currentTarget.dataset.count));
+        this.setPlayerCount(parseInt(e.currentTarget.dataset.count, 10));
       });
     });
 
@@ -409,11 +433,6 @@ export const LudoGame = {
     document.getElementById('chkColorBlind')?.addEventListener('change', (e) => {
       this.colorBlindAssist = e.target.checked;
       this.renderer.setColorBlind(this.colorBlindAssist);
-    });
-
-    document.getElementById('chkTableTilt')?.addEventListener('change', (e) => {
-      this.perspectiveView = e.target.checked;
-      document.getElementById('ludoTableContainer')?.classList.toggle('perspective-view', this.perspectiveView);
     });
 
     this.canvas.addEventListener('pointerdown', (e) => {
@@ -501,13 +520,12 @@ export const LudoGame = {
   },
 
   executeRoll() {
-    this.fsm = 'ROLLING';
     this.isRolling = true;
+    this.fsm = 'ROLLING';
     this.legalMoves = [];
     this.selectedTokenIdx = null;
 
     this.diceValue = Math.floor(Math.random() * 6) + 1;
-
     try { FXEngine.diceRoll(); } catch {}
 
     this.animateDiceTumble(this.diceValue, () => {
@@ -534,9 +552,9 @@ export const LudoGame = {
       6: { x: 0, y: 180 }
     };
 
-    const targetRot = faceRotations[targetValue];
-    const extraTurnsX = (Math.floor(Math.random() * 3) + 2) * 360;
-    const extraTurnsY = (Math.floor(Math.random() * 3) + 2) * 360;
+    const targetRot = faceRotations[targetValue] || faceRotations[1];
+    const extraTurnsX = (Math.floor(Math.random() * 2) + 2) * 360;
+    const extraTurnsY = (Math.floor(Math.random() * 2) + 2) * 360;
 
     const endX = targetRot.x + extraTurnsX;
     const endY = targetRot.y + extraTurnsY;
@@ -549,21 +567,21 @@ export const LudoGame = {
 
     const anim = cube.animate([
       { transform: 'translateY(0px) scale(1) rotateX(0deg) rotateY(0deg)' },
-      { transform: 'translateY(-28px) scale(1.15) rotateX(360deg) rotateY(180deg)', offset: 0.35 },
-      { transform: `translateY(-8px) scale(1.05) rotateX(${endX * 0.75}deg) rotateY(${endY * 0.75}deg)`, offset: 0.7 },
+      { transform: 'translateY(-24px) scale(1.12) rotateX(360deg) rotateY(180deg)', offset: 0.35 },
+      { transform: `translateY(-6px) scale(1.04) rotateX(${endX * 0.75}deg) rotateY(${endY * 0.75}deg)`, offset: 0.7 },
       { transform: `translateY(0px) scale(1) rotateX(${endX}deg) rotateY(${endY}deg)`, offset: 1 }
     ], {
-      duration: 650,
+      duration: 550,
       easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
       fill: 'forwards'
     });
 
     if (shadow) {
       shadow.animate([
-        { transform: 'scale(1)', opacity: 0.4 },
+        { transform: 'scale(1)', opacity: 0.35 },
         { transform: 'scale(0.6)', opacity: 0.15, offset: 0.35 },
-        { transform: 'scale(1)', opacity: 0.4, offset: 1 }
-      ], { duration: 650, fill: 'forwards' });
+        { transform: 'scale(1)', opacity: 0.35, offset: 1 }
+      ], { duration: 550, fill: 'forwards' });
     }
 
     anim.onfinish = () => {
@@ -596,7 +614,7 @@ export const LudoGame = {
       this.consecutiveSixes++;
       if (this.consecutiveSixes === 3) {
         this.consecutiveSixes = 0;
-        this.showStatusNotification('3 Sixes in a row! Turn skipped.');
+        this.showStatusNotification('Three 6s in a row! Turn skipped.');
         this.scheduler.after(700, () => this.advanceTurn());
         return;
       }
@@ -608,8 +626,8 @@ export const LudoGame = {
 
     if (this.legalMoves.length === 0) {
       this.fsm = 'WAIT_ROLL';
-      this.showStatusNotification('No moves available');
-      this.scheduler.after(700, () => this.advanceTurn());
+      this.showStatusNotification('No legal moves available');
+      this.scheduler.after(650, () => this.advanceTurn());
       return;
     }
 
@@ -617,13 +635,14 @@ export const LudoGame = {
 
     if (curPlayer.isBot) {
       this.fsm = 'RESOLVE';
-      this.scheduler.after(450, () => {
+      this.scheduler.after(400, () => {
         const chosenToken = LudoAI.chooseMove(
           this.difficulty,
           this.activeColor,
           this.state,
           this.diceValue,
-          this.legalMoves
+          this.legalMoves,
+          this.players
         );
         this.commitMove(chosenToken);
       });
@@ -631,7 +650,7 @@ export const LudoGame = {
       if (this.legalMoves.length === 1 && this.autoMoveSingle) {
         this.fsm = 'RESOLVE';
         this.selectedTokenIdx = this.legalMoves[0];
-        this.scheduler.after(300, () => this.commitMove(this.legalMoves[0]));
+        this.scheduler.after(250, () => this.commitMove(this.legalMoves[0]));
       } else {
         this.fsm = 'WAIT_PICK';
         this.selectedTokenIdx = this.legalMoves[0];
@@ -721,14 +740,14 @@ export const LudoGame = {
 
     if (finalP === 56) {
       extraTurn = true;
-      try { FXEngine.playTone(880, 'triangle', 0.1, 0.2); } catch {}
+      try { FXEngine.playTone(880, 'triangle', 0.1, 0.15); } catch {}
 
       const allHome = this.state.tokens[color].every(step => step === 56);
       if (allHome) {
         if (!this.state.finishRank.includes(color)) {
           this.state.finishRank.push(color);
         }
-        try { FXEngine.confetti(80); } catch {}
+        try { FXEngine.confetti(40); } catch {}
 
         this.renderPlayerSlots();
 
@@ -741,11 +760,13 @@ export const LudoGame = {
       }
     }
 
+    this.saveState();
+
     if (extraTurn) {
       this.fsm = 'WAIT_ROLL';
       this.syncUI();
       if (this.getCurrentPlayer().isBot) {
-        this.scheduler.after(600, () => this.triggerBotCycle());
+        this.scheduler.after(550, () => this.triggerBotCycle());
       }
     } else {
       this.advanceTurn();
@@ -766,12 +787,12 @@ export const LudoGame = {
     this.syncUI();
 
     if (this.getCurrentPlayer().isBot) {
-      this.scheduler.after(600, () => this.triggerBotCycle());
+      this.scheduler.after(550, () => this.triggerBotCycle());
     }
   },
 
   triggerBotCycle() {
-    if (this.fsm !== 'WAIT_ROLL' || !this.getCurrentPlayer().isBot) return;
+    if (this.fsm !== 'WAIT_ROLL' || !this.getCurrentPlayer().isBot || this.isRolling) return;
     this.executeRoll();
   },
 
@@ -784,7 +805,6 @@ export const LudoGame = {
     const curPlayer = this.getCurrentPlayer();
     const line = document.getElementById('ludoStatusLine');
     const sub = document.getElementById('ludoSubNotice');
-    const tray = document.getElementById('ludoDiceTray');
     const rollBtn = document.getElementById('btnRollDiceDirect');
 
     if (line) {
@@ -797,11 +817,7 @@ export const LudoGame = {
     }
 
     if (sub) {
-      sub.textContent = curPlayer.isBot ? 'Bot is thinking...' : 'Tap Dice or press SPACE';
-    }
-
-    if (tray) {
-      tray.style.setProperty('--ludo-tray-tint', LUDO_PALETTE[this.activeColor]);
+      sub.textContent = curPlayer.isBot ? 'Bot is thinking...' : 'Tap the dice or press Space';
     }
 
     if (rollBtn) {
@@ -824,11 +840,11 @@ export const LudoGame = {
       const rankText = rankIdx !== -1 ? `(#${rankIdx + 1})` : `Home ${finished}/4`;
 
       return `
-        <div class="ludo-player-card ${isCur ? 'active' : ''}" style="display:flex; align-items:center; gap:6px; padding:6px; border:2px solid ${isCur ? LUDO_PALETTE[p.color] : '#ccc'}; border-radius:6px; background:${isCur ? 'rgba(0,0,0,0.04)' : 'transparent'};">
-          <span style="width:12px; height:12px; border-radius:50%; background:${LUDO_PALETTE[p.color]}; display:inline-block; border:1px solid #000;"></span>
-          <div style="display:flex; flex-direction:column; line-height:1.1;">
-            <span style="font-size:0.75rem; font-weight:800; color:${isCur ? LUDO_PALETTE[p.color] : 'inherit'};">${p.name}</span>
-            <span style="font-size:0.65rem; color:#666;">${rankText}</span>
+        <div class="ludo-player-card ${isCur ? 'active' : ''}" style="display:flex; align-items:center; gap:6px; padding:6px; border:1px solid ${isCur ? LUDO_PALETTE[p.color] : 'var(--border-line)'}; border-radius:4px; background:${isCur ? 'var(--bg-surface-hover)' : 'var(--bg-panel)'};">
+          <span style="width:10px; height:10px; border-radius:50%; background:${LUDO_PALETTE[p.color]}; display:inline-block;"></span>
+          <div style="display:flex; flex-direction:column; line-height:1.2;">
+            <span style="font-size:0.75rem; font-weight:700; color:${isCur ? LUDO_PALETTE[p.color] : 'inherit'};">${p.name}</span>
+            <span style="font-size:0.65rem; color:var(--text-dim);">${rankText}</span>
           </div>
         </div>
       `;
@@ -842,8 +858,7 @@ export const LudoGame = {
         legalMoves: this.legalMoves,
         animatingHop: this.animatingHop,
         selectedToken: this.selectedTokenIdx !== null ? { color: this.activeColor, index: this.selectedTokenIdx } : null,
-        hoverPreviewCell: this.hoverCell,
-        effects: this.effects
+        hoverPreviewCell: this.hoverCell
       });
 
       this.rAFId = requestAnimationFrame(frame);
@@ -856,10 +871,15 @@ export const LudoGame = {
     this.matchEndedCalled = true;
     this.fsm = 'GAME_OVER';
 
-    const rank = this.state.finishRank.indexOf(this.humanColor) + 1 || (outcome === 'WIN' ? 1 : 4);
+    localStorage.removeItem('parlour_ludo_autosave');
+
+    let rank = this.state.finishRank.indexOf(this.humanColor) + 1;
+    if (rank === 0) {
+      rank = outcome === 'WIN' ? 1 : this.players.length;
+    }
 
     const outcomePayload = {
-      summary: `Finished #${rank} in Custom Match`,
+      summary: `Finished #${rank} (${this.difficulty} Match)`,
       ranked: false
     };
 

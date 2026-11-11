@@ -2,35 +2,35 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Cyber Arcade Engine Pro — Automated Asset Exporter</title>
+  <title>Icon Generator — Mini Arcade</title>
   <style>
     body {
-      background: #050814;
-      color: #f0f6fc;
-      font-family: sans-serif;
+      background: #0e1117;
+      color: #e6edf3;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       padding: 32px;
       text-align: center;
     }
     canvas {
-      border: 1px solid #00f0ff;
+      border: 1px solid #30363d;
       margin: 16px;
-      border-radius: 16px;
+      border-radius: 12px;
     }
     button {
-      padding: 12px 24px;
-      background: #00f0ff;
-      color: #050814;
-      font-weight: bold;
+      padding: 10px 20px;
+      background: #2f81f7;
+      color: #ffffff;
+      font-weight: 600;
       border: none;
-      border-radius: 8px;
+      border-radius: 6px;
       cursor: pointer;
     }
   </style>
 </head>
 <body>
-  <h1>Cyber Arcade Asset Generator</h1>
-  <p>Generates production PNG binaries (192px, 512px standard, and 512px maskable) directly from code.</p>
-  <button id="btnExport">GENERATE & DOWNLOAD ASSETS</button>
+  <h1>App Icon Generator</h1>
+  <p>Generates PNG icon assets (192px, 512px, and 512px maskable) directly on canvas.</p>
+  <button id="btnExport">Download Icons</button>
   <br>
   <canvas id="c192" width="192" height="192"></canvas>
   <canvas id="c512" width="512" height="512"></canvas>
@@ -41,41 +41,41 @@
       const ctx = canvas.getContext('2d');
       const s = canvas.width;
 
-      // Background
-      ctx.fillStyle = '#050814';
+      ctx.fillStyle = '#0e1117';
       ctx.fillRect(0, 0, s, s);
 
-      // Geometric Console Emblem
       const center = s / 2;
       const radius = isMaskable ? s * 0.28 : s * 0.38;
 
       ctx.save();
       ctx.translate(center, center);
 
-      // Outer Isometric Hexagram
+      // Gamepad console outline
       ctx.beginPath();
-      for (let i = 0; i < 6; i++) {
-        const a = (i * Math.PI) / 3;
-        const x = Math.cos(a) * radius;
-        const y = Math.sin(a) * radius;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.closePath();
-      ctx.strokeStyle = '#00f0ff';
-      ctx.lineWidth = s * 0.04;
+      const padW = radius * 1.5;
+      const padH = radius * 0.9;
+      ctx.roundRect(-padW / 2, -padH / 2, padW, padH, padH * 0.25);
+      ctx.fillStyle = '#161b22';
+      ctx.fill();
+      ctx.strokeStyle = '#2f81f7';
+      ctx.lineWidth = s * 0.035;
       ctx.stroke();
 
-      // Inner Core Accent
+      // D-Pad plus sign
+      const dSize = radius * 0.22;
+      ctx.fillStyle = '#e6edf3';
+      ctx.fillRect(-radius * 0.45 - dSize / 6, -dSize / 2, dSize / 3, dSize);
+      ctx.fillRect(-radius * 0.45 - dSize / 2, -dSize / 6, dSize, dSize / 3);
+
+      // Buttons
       ctx.beginPath();
-      ctx.arc(0, 0, radius * 0.45, 0, Math.PI * 2);
-      ctx.fillStyle = '#ff007f';
+      ctx.arc(radius * 0.45, -radius * 0.1, radius * 0.1, 0, Math.PI * 2);
+      ctx.fillStyle = '#f85149';
       ctx.fill();
 
-      // Top Highlight
       ctx.beginPath();
-      ctx.arc(0, 0, radius * 0.2, 0, Math.PI * 2);
-      ctx.fillStyle = '#ffffff';
+      ctx.arc(radius * 0.3, radius * 0.12, radius * 0.1, 0, Math.PI * 2);
+      ctx.fillStyle = '#d29922';
       ctx.fill();
 
       ctx.restore();

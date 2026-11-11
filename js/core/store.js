@@ -1,7 +1,3 @@
-/**
- * js/core/store.js
- * Observable Settings & Reactive State Store with LocalStorage Persistence
- */
 export class Store {
   constructor(storageKey, initialState) {
     this.storageKey = storageKey;

@@ -1,14 +1,14 @@
 {
-  "id": "parlour-arcade-cabinet-v1",
-  "name": "Parlour Arcade",
-  "short_name": "Parlour",
-  "description": "A classic parlour cabinet collection of offline board and arcade games.",
+  "id": "mini-arcade-pwa-v1",
+  "name": "Mini Arcade",
+  "short_name": "Arcade",
+  "description": "A collection of classic offline browser games built with vanilla JavaScript.",
   "start_url": "./#/",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#0a0d14",
-  "theme_color": "#0a0d14",
+  "background_color": "#0e1117",
+  "theme_color": "#0e1117",
   "icons": [
     {
       "src": "icons/icon-192.png",
@@ -31,37 +31,37 @@
   ],
   "shortcuts": [
     {
-      "name": "Ludo Royale",
+      "name": "Ludo",
       "short_name": "Ludo",
-      "description": "Roll, race, and capture on a classic paper board",
+      "description": "Play Ludo locally or against bots",
       "url": "./#/game/ludo",
       "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
     },
     {
-      "name": "Snake Rush",
+      "name": "Snake",
       "short_name": "Snake",
       "description": "Eat pellets, grow longer, and avoid walls",
       "url": "./#/game/snake",
       "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
     },
     {
-      "name": "Grid AI",
-      "short_name": "Grid AI",
-      "description": "Play noughts and crosses against a smart bot",
+      "name": "Tic Tac Toe",
+      "short_name": "Tic Tac Toe",
+      "description": "Quick 3x3 match against the bot",
       "url": "./#/game/tictactoe",
       "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
     },
     {
-      "name": "Memory Matrix",
+      "name": "Memory",
       "short_name": "Memory",
       "description": "Find all eight pairs in fewer moves",
       "url": "./#/game/memory",
       "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
     },
     {
-      "name": "Flappy Pilot",
+      "name": "Flappy Bird",
       "short_name": "Flappy",
-      "description": "Fly between the gates without crashing",
+      "description": "Fly between pipe gaps without hitting them",
       "url": "./#/game/flappy",
       "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
     }

@@ -1,9 +1,3 @@
-/**
- * js/games/ludo-rules.js
- * Standard Ludo Rules & Track Coordinates
- * 15x15 board geometry, 52 track cells, 8 safe zones, step 56 home
- */
-
 export const LUDO_COLORS = ['RED', 'GREEN', 'YELLOW', 'BLUE'];
 
 export const LUDO_PALETTE = {
@@ -11,9 +5,9 @@ export const LUDO_PALETTE = {
   GREEN: '#43A047',
   YELLOW: '#FDD835',
   BLUE: '#1E88E5',
-  PAPER: '#FFFDF5',
-  INK: '#2B2B2B',
-  FRAME: '#3E2723'
+  PAPER: '#FFFDF7',
+  INK: '#222222',
+  FRAME: '#2B1D16'
 };
 
 export const LUDO_CONFIG = {
@@ -105,7 +99,7 @@ export const LudoRules = {
     return trackIndex !== -1 && LUDO_CONFIG.SAFE_SQUARES.includes(trackIndex);
   },
 
-  getLegalMoves(gameState, color, roll, options = { blockadeRule: false }) {
+  getLegalMoves(gameState, color, roll) {
     if (roll < 1 || roll > 6) return [];
     const tokens = gameState.tokens[color];
     if (!tokens) return [];
@@ -115,26 +109,20 @@ export const LudoRules = {
     for (let i = 0; i < tokens.length; i++) {
       const p = tokens[i];
 
+      // Pawn in yard only comes out on 6
       if (p === -1) {
         if (roll === 6) {
-          if (options.blockadeRule) {
-            const hasStartBlockade = this.isCellBlockaded(gameState, color, 0);
-            if (!hasStartBlockade) legalIndices.push(i);
-          } else {
-            legalIndices.push(i);
-          }
+          legalIndices.push(i);
         }
         continue;
       }
 
+      // Already finished
       if (p === 56) continue;
 
+      // Exact number needed for step 56 (no overshoot)
       const targetProgress = p + roll;
       if (targetProgress > 56) continue;
-
-      if (options.blockadeRule && this.isPathBlocked(gameState, color, p, targetProgress)) {
-        continue;
-      }
 
       legalIndices.push(i);
     }
@@ -167,39 +155,6 @@ export const LudoRules = {
     return null;
   },
 
-  isCellBlockaded(gameState, color, progress) {
-    if (progress < 0 || progress > 50) return false;
-    const trackIdx = this.getTrackIndex(color, progress);
-    const tokens = gameState.tokens[color];
-    let count = 0;
-    for (const p of tokens) {
-      if (p >= 0 && p <= 50 && this.getTrackIndex(color, p) === trackIdx) {
-        count++;
-        if (count >= 2) return true;
-      }
-    }
-    return false;
-  },
-
-  isPathBlocked(gameState, movingColor, fromProgress, toProgress) {
-    for (let step = fromProgress + 1; step <= toProgress; step++) {
-      if (step > 50) break;
-      const stepTrackIdx = this.getTrackIndex(movingColor, step);
-      for (const oppColor of LUDO_COLORS) {
-        if (oppColor === movingColor) continue;
-        let count = 0;
-        const oppTokens = gameState.tokens[oppColor] || [];
-        for (const p of oppTokens) {
-          if (p >= 0 && p <= 50 && this.getTrackIndex(oppColor, p) === stepTrackIdx) {
-            count++;
-            if (count >= 2) return true;
-          }
-        }
-      }
-    }
-    return false;
-  },
-
   applyMove(gameState, color, tokenIndex, roll) {
     const nextState = {
       tokens: {
@@ -213,7 +168,7 @@ export const LudoRules = {
     };
 
     const curP = nextState.tokens[color][tokenIndex];
-    let nextP = (curP === -1) ? 0 : curP + roll;
+    const nextP = (curP === -1) ? 0 : curP + roll;
     nextState.tokens[color][tokenIndex] = nextP;
 
     let captured = null;
