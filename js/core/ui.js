@@ -1,3 +1,4 @@
+// ui.js: opens and closes dialogs and remembers which ones are open.
 export class UIManager {
   constructor() {
     this.dialogStack = [];

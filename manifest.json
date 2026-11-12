@@ -1,70 +1,24 @@
 {
-  "id": "mini-arcade-pwa-v1",
+  "id": "mini-arcade",
   "name": "Mini Arcade",
-  "short_name": "Arcade",
-  "description": "A collection of classic offline browser games built with vanilla JavaScript.",
+  "short_name": "Mini Arcade",
+  "description": "Eleven small games that run in the browser and keep working offline.",
   "start_url": "./#/",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#0e1117",
-  "theme_color": "#0e1117",
+  "background_color": "#f2f6fb",
+  "theme_color": "#f2f6fb",
   "icons": [
-    {
-      "src": "icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icons/maskable-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    }
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    {
-      "name": "Ludo",
-      "short_name": "Ludo",
-      "description": "Play Ludo locally or against bots",
-      "url": "./#/game/ludo",
-      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "Snake",
-      "short_name": "Snake",
-      "description": "Eat pellets, grow longer, and avoid walls",
-      "url": "./#/game/snake",
-      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "Tic Tac Toe",
-      "short_name": "Tic Tac Toe",
-      "description": "Quick 3x3 match against the bot",
-      "url": "./#/game/tictactoe",
-      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "Memory",
-      "short_name": "Memory",
-      "description": "Find all eight pairs in fewer moves",
-      "url": "./#/game/memory",
-      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "Flappy Bird",
-      "short_name": "Flappy",
-      "description": "Fly between pipe gaps without hitting them",
-      "url": "./#/game/flappy",
-      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
-    }
+    { "name": "Ludo", "url": "./#/game/ludo", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Snake", "url": "./#/game/snake", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Tic Tac Toe", "url": "./#/game/tictactoe", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Memory", "url": "./#/game/memory", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
   ],
-  "categories": ["games", "arcade", "entertainment"]
+  "categories": ["games", "entertainment"]
 }

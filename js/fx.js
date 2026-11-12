@@ -1,13 +1,10 @@
+// fx.js: sound effects (made with the Web Audio API, no audio files), shake and confetti.
 import { SettingsStore } from './core/store.js';
 
 export const FXEngine = {
   audioCtx: null,
-  musicBus: null,
   sfxBus: null,
   compressor: null,
-
-  droneNodes: null,
-  isDronePlaying: false,
 
   canvas: null,
   ctx: null,
@@ -36,6 +33,7 @@ export const FXEngine = {
       const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
       this.audioCtx = new AudioCtxClass();
 
+      // compressor so loud sounds don't clip on phone speakers
       this.compressor = this.audioCtx.createDynamicsCompressor();
       this.compressor.threshold.setValueAtTime(-20, this.audioCtx.currentTime);
       this.compressor.knee.setValueAtTime(24, this.audioCtx.currentTime);
@@ -44,13 +42,8 @@ export const FXEngine = {
       this.compressor.release.setValueAtTime(0.2, this.audioCtx.currentTime);
       this.compressor.connect(this.audioCtx.destination);
 
-      this.musicBus = this.audioCtx.createGain();
-      const musicVol = SettingsStore.get('volumeMusic') ?? 0.04;
-      this.musicBus.gain.setValueAtTime(musicVol, this.audioCtx.currentTime);
-      this.musicBus.connect(this.compressor);
-
       this.sfxBus = this.audioCtx.createGain();
-      const sfxVol = SettingsStore.get('volumeSfx') ?? 0.2;
+      const sfxVol = SettingsStore.get('volumeSfx') ?? 0.8;
       this.sfxBus.gain.setValueAtTime(sfxVol, this.audioCtx.currentTime);
       this.sfxBus.connect(this.compressor);
     }
@@ -58,52 +51,6 @@ export const FXEngine = {
     if (this.audioCtx.state === 'suspended') {
       this.audioCtx.resume();
     }
-  },
-
-  startAmbientDrone() {
-    if (this.isDronePlaying || SettingsStore.get('muted')) return;
-    this.ensureAudioContext();
-    const ctx = this.audioCtx;
-
-    const osc = ctx.createOscillator();
-    const filter = ctx.createBiquadFilter();
-    const gain = ctx.createGain();
-
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(60, ctx.currentTime);
-
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(120, ctx.currentTime);
-
-    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(0.015, ctx.currentTime + 1.5);
-
-    osc.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.musicBus);
-
-    osc.start();
-    this.droneNodes = { osc, gain };
-    this.isDronePlaying = true;
-  },
-
-  stopAmbientDrone() {
-    if (!this.isDronePlaying || !this.droneNodes) return;
-    const { osc, gain } = this.droneNodes;
-    const ctx = this.audioCtx;
-
-    gain.gain.cancelScheduledValues(ctx.currentTime);
-    gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(0.0001, ctx.currentTime + 0.3);
-
-    setTimeout(() => {
-      try {
-        osc.stop();
-        osc.disconnect();
-      } catch {}
-      this.droneNodes = null;
-      this.isDronePlaying = false;
-    }, 320);
   },
 
   playTone(freq, type = 'triangle', duration = 0.08, vol = 0.12) {
@@ -132,12 +79,12 @@ export const FXEngine = {
     this.ensureAudioContext();
     const ctx = this.audioCtx;
     const now = ctx.currentTime;
-    const rattles = 6;
-    const totalDuration = 0.45;
+    const rattles = 7;
+    const totalDuration = 0.6;
 
     for (let i = 0; i < rattles; i++) {
-      const timeOffset = now + (i * (totalDuration / rattles)) + (Math.random() * 0.015);
-      const bufferSize = Math.floor(ctx.sampleRate * 0.03);
+      const timeOffset = now + (i * (totalDuration / rattles)) + (Math.random() * 0.02);
+      const bufferSize = Math.floor(ctx.sampleRate * 0.035);
       const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const output = buffer.getChannelData(0);
 
@@ -150,20 +97,20 @@ export const FXEngine = {
 
       const filter = ctx.createBiquadFilter();
       filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(1200 + Math.random() * 300, timeOffset);
-      filter.Q.setValueAtTime(2.5, timeOffset);
+      filter.frequency.setValueAtTime(1300 + Math.random() * 350, timeOffset);
+      filter.Q.setValueAtTime(2.8, timeOffset);
 
       const gain = ctx.createGain();
-      const vol = 0.1 + Math.random() * 0.04;
+      const vol = 0.12 + Math.random() * 0.05;
       gain.gain.setValueAtTime(vol, timeOffset);
-      gain.gain.exponentialRampToValueAtTime(0.0001, timeOffset + 0.028);
+      gain.gain.exponentialRampToValueAtTime(0.0001, timeOffset + 0.032);
 
       whiteNoise.connect(filter);
       filter.connect(gain);
       gain.connect(this.sfxBus);
 
       whiteNoise.start(timeOffset);
-      whiteNoise.stop(timeOffset + 0.03);
+      whiteNoise.stop(timeOffset + 0.035);
     }
   },
 
@@ -177,17 +124,17 @@ export const FXEngine = {
     const gain = ctx.createGain();
 
     osc.type = 'triangle';
-    osc.frequency.setValueAtTime(140, now);
-    osc.frequency.exponentialRampToValueAtTime(40, now + 0.1);
+    osc.frequency.setValueAtTime(135, now);
+    osc.frequency.exponentialRampToValueAtTime(38, now + 0.11);
 
-    gain.gain.setValueAtTime(0.2, now);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.1);
+    gain.gain.setValueAtTime(0.24, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
 
     osc.connect(gain);
     gain.connect(this.sfxBus);
 
     osc.start(now);
-    osc.stop(now + 0.11);
+    osc.stop(now + 0.13);
   },
 
   tokenHop() {
@@ -200,17 +147,17 @@ export const FXEngine = {
     const gain = ctx.createGain();
 
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(420, now);
-    osc.frequency.exponentialRampToValueAtTime(540, now + 0.05);
+    osc.frequency.setValueAtTime(440, now);
+    osc.frequency.exponentialRampToValueAtTime(580, now + 0.055);
 
-    gain.gain.setValueAtTime(0.12, now);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+    gain.gain.setValueAtTime(0.14, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.065);
 
     osc.connect(gain);
     gain.connect(this.sfxBus);
 
     osc.start(now);
-    osc.stop(now + 0.065);
+    osc.stop(now + 0.07);
   },
 
   cutOpponent() {
@@ -224,17 +171,17 @@ export const FXEngine = {
     const gain = ctx.createGain();
 
     osc.type = 'triangle';
-    osc.frequency.setValueAtTime(220, now);
-    osc.frequency.exponentialRampToValueAtTime(40, now + 0.25);
+    osc.frequency.setValueAtTime(240, now);
+    osc.frequency.exponentialRampToValueAtTime(45, now + 0.28);
 
-    gain.gain.setValueAtTime(0.25, now);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
+    gain.gain.setValueAtTime(0.3, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
 
     osc.connect(gain);
     gain.connect(this.sfxBus);
 
     osc.start(now);
-    osc.stop(now + 0.28);
+    osc.stop(now + 0.32);
   },
 
   shake(intensity = 'soft') {
@@ -256,23 +203,23 @@ export const FXEngine = {
     this.canvas.height = window.innerHeight * dpr;
   },
 
-  confetti(count = 40) {
+  confetti(count = 50) {
     if (SettingsStore.get('reducedMotion') || !this.ctx) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const colors = ['#E53935', '#43A047', '#FDD835', '#1E88E5', '#2f81f7', '#e6edf3'];
+    const colors = ['#d8504e', '#3fa66a', '#f2b705', '#3d63e0', '#e8893c', '#ffffff'];
     const originX = (window.innerWidth / 2) * dpr;
     const originY = (window.innerHeight * 0.35) * dpr;
 
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = (Math.random() * 6 + 3) * dpr;
+      const speed = (Math.random() * 7 + 3) * dpr;
       this.particles.push({
         x: originX,
         y: originY,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed - (2 * dpr),
-        width: (Math.random() * 7 + 4) * dpr,
-        height: (Math.random() * 4 + 3) * dpr,
+        width: (Math.random() * 8 + 4) * dpr,
+        height: (Math.random() * 5 + 3) * dpr,
         color: colors[Math.floor(Math.random() * colors.length)],
         rotation: Math.random() * 360,
         rotSpeed: (Math.random() - 0.5) * 8,
@@ -305,6 +252,7 @@ export const FXEngine = {
       this.ctx.rotate((p.rotation * Math.PI) / 180);
       this.ctx.globalAlpha = Math.max(0, p.opacity);
 
+      // little paper rectangles
       this.ctx.fillStyle = p.color;
       this.ctx.fillRect(-p.width / 2, -p.height / 2, p.width, p.height);
 
@@ -327,19 +275,19 @@ export const FXEngine = {
     diceLand() { FXEngine.diceLand(); },
     eat() {
       FXEngine.shake('soft');
-      FXEngine.playTone(660, 'triangle', 0.03, 0.1);
+      FXEngine.playTone(660, 'triangle', 0.03, 0.12);
     },
-    flap() { FXEngine.playTone(520, 'triangle', 0.03, 0.07); },
+    flap() { FXEngine.playTone(520, 'triangle', 0.03, 0.08); },
     victory() {
-      FXEngine.confetti(40);
+      FXEngine.confetti(60);
       [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
-        setTimeout(() => FXEngine.playTone(f, 'triangle', 0.08, 0.12), i * 75);
+        setTimeout(() => FXEngine.playTone(f, 'triangle', 0.1, 0.15), i * 80);
       });
     },
     defeat() {
       FXEngine.shake('hard');
-      [300, 240, 180, 130].forEach((f, i) => {
-        setTimeout(() => FXEngine.playTone(f, 'triangle', 0.09, 0.12), i * 75);
+      [320, 250, 180, 130].forEach((f, i) => {
+        setTimeout(() => FXEngine.playTone(f, 'triangle', 0.1, 0.14), i * 80);
       });
     }
   }

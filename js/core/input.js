@@ -1,11 +1,14 @@
+// input.js: one place for keyboard, pointer and swipe input.
 export class InputManager {
   constructor(targetElement = window) {
     this.target = targetElement;
-    this.actions = new Set();
+    this.actions = new Set();   // keys that are held down right now
+    this.taps = new Set();      // presses nobody has used yet, so a very quick tap is not lost
     this.bindings = new Map();
     this.listeners = [];
     this.disposed = false;
 
+    // Pointer gesture coordinates
     this.touchStartX = 0;
     this.touchStartY = 0;
     this.swipeThreshold = 24;
@@ -36,13 +39,16 @@ export class InputManager {
     const onKeyDown = (e) => {
       if (this.disposed) return;
       if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
+      if (document.querySelector('dialog[open]')) return;   // the pause menu is open
 
       const action = this.bindings.get(e.code);
       if (action) {
+        // stop the page from scrolling on arrows and space
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
           e.preventDefault();
         }
         this.actions.add(action);
+        if (!e.repeat) this.taps.add(action);
       }
     };
 
@@ -91,6 +97,7 @@ export class InputManager {
 
   pulseAction(action) {
     this.actions.add(action);
+    this.taps.add(action);
     setTimeout(() => this.actions.delete(action), 50);
   }
 
@@ -101,7 +108,8 @@ export class InputManager {
 
   consume(action) {
     this.pollGamepad();
-    if (this.actions.has(action)) {
+    if (this.taps.has(action) || this.actions.has(action)) {
+      this.taps.delete(action);
       this.actions.delete(action);
       return true;
     }
@@ -126,5 +134,6 @@ export class InputManager {
     for (const off of this.listeners) off();
     this.listeners = [];
     this.actions.clear();
+    this.taps.clear();
   }
 }

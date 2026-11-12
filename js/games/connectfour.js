@@ -1,19 +1,22 @@
+// connectfour.js: Connect 4 on a 7 by 6 board. The bot wins if it can, blocks if it must,
+// and otherwise likes the middle. You can also play a friend on the same phone.
+
 export default {
   id: 'connectfour',
   title: 'Connect 4',
-  accent: '#f85149',
+  accent: '#d8504e',
+  vsOpponent: true,
 
   ctx: null,
   container: null,
 
   cols: 7,
   rows: 6,
-  board: [],
-  currentPlayer: 'RED',
+  board: [], // 2D array [row][col]: null | 'RED' | 'YELLOW'
+  currentPlayer: 'RED', // Player is RED, Bot/P2 is YELLOW
   isLocked: false,
   isGameOver: false,
-  mode: 'VS_BOT',
-  seriesScore: { red: 0, yellow: 0, ties: 0 },
+  mode: 'VS_BOT', // 'VS_BOT' | '2P_LOCAL'
 
   mount(el, sessionCtx) {
     this.container = el;
@@ -21,20 +24,20 @@ export default {
 
     this.container.innerHTML = `
       <div class="arena-dual-layout">
-        <div class="arena-board-frame" style="flex-direction:column; align-items:stretch; width:min(calc(100vw - 24px), 420px); padding:10px; background:#161b22; border:1px solid var(--border-line); border-radius:8px;">
-          <div id="c4DropArrows" style="display:grid; grid-template-columns:repeat(7, 1fr); gap:6px; margin-bottom:6px; width:100%;">
+        <div class="arena-board-frame" style="flex-direction:column; align-items:stretch; width:min(calc(100vw - 24px), 440px); padding:10px;">
+          <div id="c4DropArrows" style="display:grid; grid-template-columns:repeat(7, 1fr); gap:6px; margin-bottom:8px; width:100%;">
             ${Array(7).fill(0).map((_, i) => `
-              <button type="button" class="btn-nav-pill c4-drop-btn" data-col="${i}" style="height:32px; min-width:0; padding:0; justify-content:center; font-size:0.9rem;" aria-label="Drop column ${i + 1}">▼</button>
+              <button type="button" class="btn-nav-pill c4-drop-btn" data-col="${i}" style="height:36px; min-width:0; padding:0;" aria-label="Drop in column ${i + 1}">&#9660;</button>
             `).join('')}
           </div>
 
-          <div id="c4GridWrapper" style="display:grid; grid-template-columns:repeat(7, 1fr); grid-template-rows:repeat(6, 1fr); gap:6px; width:100%; aspect-ratio:7 / 6; background:#1f3a60; padding:8px; border-radius:6px; border:1px solid var(--border-line);">
+          <div id="c4GridWrapper">
             ${Array(42).fill(0).map((_, i) => {
               const r = Math.floor(i / 7);
               const c = i % 7;
               return `
-                <div class="c4-slot" data-r="${r}" data-c="${c}" style="position:relative; width:100%; height:100%; border-radius:50%; background:#0e1117; overflow:hidden; cursor:pointer;">
-                  <div class="c4-disc" style="position:absolute; inset:0; border-radius:50%; transform:translateY(-120%); transition:transform 0.2s ease-out;"></div>
+                <div class="c4-slot" data-r="${r}" data-c="${c}">
+                  <div class="c4-disc"></div>
                 </div>
               `;
             }).join('')}
@@ -42,39 +45,16 @@ export default {
         </div>
 
         <div class="arena-side-controls">
-          <div class="telemetry-cell" style="text-align:center; padding:12px;">
-            <span class="t-label">Turn</span>
-            <div id="c4TurnStatus" class="t-val" style="font-size:1.15rem; margin:2px 0; color:var(--status-loss);">
-              Your turn (Red)
-            </div>
-            <div id="c4SubStatus" style="font-size:0.75rem; color:var(--text-dim);">
-              Pick a column to drop
-            </div>
+          <div class="stat-box" style="text-align:center;">
+            <div id="c4TurnStatus" class="stat-value">Your turn (red)</div>
+            <div id="c4SubStatus" class="stat-label">Pick a column</div>
           </div>
 
-          <div class="telemetry-cell" style="padding:10px;">
-            <span class="t-label" style="text-align:center; margin-bottom:6px;">Score</span>
-            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; text-align:center;">
-              <div>
-                <div style="font-size:0.7rem; color:var(--text-sub); font-weight:600;">RED</div>
-                <div id="c4ScoreRed" class="t-val" style="font-size:1.2rem; color:var(--status-loss);">0</div>
-              </div>
-              <div>
-                <div style="font-size:0.7rem; color:var(--text-sub); font-weight:600;">DRAW</div>
-                <div id="c4ScoreTies" class="t-val" style="font-size:1.2rem; color:var(--text-main);">0</div>
-              </div>
-              <div>
-                <div style="font-size:0.7rem; color:var(--text-sub); font-weight:600;">YELLOW</div>
-                <div id="c4ScoreYellow" class="t-val" style="font-size:1.2rem; color:var(--status-coin);">0</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="telemetry-cell" style="gap:6px;">
-            <span class="t-label">Mode</span>
+          <div class="stat-box" style="gap:8px;">
+            <span class="stat-label">Who do you play?</span>
             <div style="display:flex; gap:6px;">
-              <button type="button" class="btn-nav-pill" id="btnC4VsBot" style="flex:1; justify-content:center; border-color:var(--brand-accent);">vs Bot</button>
-              <button type="button" class="btn-nav-pill" id="btnC4VsPlayer" style="flex:1; justify-content:center;">2-Player</button>
+              <button type="button" class="btn-nav-pill is-on" id="btnC4VsBot" style="flex:1;">The bot</button>
+              <button type="button" class="btn-nav-pill" id="btnC4VsPlayer" style="flex:1;">A friend</button>
             </div>
           </div>
         </div>
@@ -101,8 +81,8 @@ export default {
     const btnBot = document.getElementById('btnC4VsBot');
     const btnPlayer = document.getElementById('btnC4VsPlayer');
     if (btnBot && btnPlayer) {
-      btnBot.style.borderColor = (m === 'VS_BOT') ? 'var(--brand-accent)' : 'var(--border-line)';
-      btnPlayer.style.borderColor = (m === '2P_LOCAL') ? 'var(--brand-accent)' : 'var(--border-line)';
+      btnBot.classList.toggle('is-on', m === 'VS_BOT');
+      btnPlayer.classList.toggle('is-on', m === '2P_LOCAL');
     }
   },
 
@@ -142,7 +122,7 @@ export default {
 
   dropDisc(col) {
     const row = this.findLowestEmptyRow(col);
-    if (row === -1) return;
+    if (row === -1) return; // column is full
 
     this.isLocked = true;
     this.board[row][col] = this.currentPlayer;
@@ -173,13 +153,13 @@ export default {
 
   triggerBotTurn() {
     const sub = document.getElementById('c4SubStatus');
-    if (sub) sub.textContent = 'Bot is thinking...';
+    if (sub) sub.textContent = 'Thinking...';
 
-    setTimeout(() => {
+    this.ctx.scheduler.after(450, () => {
       if (this.isGameOver) return;
       const col = this.computeBotMove();
       this.dropDisc(col);
-    }, 400);
+    });
   },
 
   computeBotMove() {
@@ -188,6 +168,7 @@ export default {
       if (this.findLowestEmptyRow(c) !== -1) validCols.push(c);
     }
 
+    // can the bot win right now?
     for (const c of validCols) {
       const r = this.findLowestEmptyRow(c);
       this.board[r][c] = 'YELLOW';
@@ -196,6 +177,7 @@ export default {
       if (win) return c;
     }
 
+    // can the player win next move? block it
     for (const c of validCols) {
       const r = this.findLowestEmptyRow(c);
       this.board[r][c] = 'RED';
@@ -204,16 +186,18 @@ export default {
       if (win) return c;
     }
 
+    // otherwise the middle column
     if (validCols.includes(3)) return 3;
+
     return validCols[Math.floor(Math.random() * validCols.length)];
   },
 
   checkWin(b, r, c, player) {
     const directions = [
-      [[0, 1], [0, -1]],
-      [[1, 0], [-1, 0]],
-      [[1, 1], [-1, -1]],
-      [[1, -1], [-1, 1]]
+      [[0, 1], [0, -1]],  // Horizontal
+      [[1, 0], [-1, 0]],  // Vertical
+      [[1, 1], [-1, -1]], // Diagonal \
+      [[1, -1], [-1, 1]]  // Diagonal /
     ];
 
     for (const [dir1, dir2] of directions) {
@@ -243,36 +227,32 @@ export default {
     this.isGameOver = true;
     this.isLocked = true;
 
-    if (result === 'DRAW') {
-      this.seriesScore.ties++;
-      this.ctx.fx.playTone(330, 'triangle', 0.12, 0.1);
-      this.ctx.recordResult('DRAW', { summary: 'Match Draw' });
-    } else {
-      if (winLine) {
-        winLine.forEach(({ r, c }) => {
-          const slot = document.querySelector(`.c4-slot[data-r="${r}"][data-c="${c}"]`);
-          if (slot) {
-            slot.style.outline = '2px solid #ffffff';
-          }
-        });
-      }
+    const vsBot = this.mode === 'VS_BOT';
 
-      if (result === 'RED') {
-        this.seriesScore.red++;
-        this.ctx.fx.sfx.victory();
-        this.ctx.recordResult('WIN', { summary: 'Player Won Connect 4!' });
-      } else {
-        this.seriesScore.yellow++;
-        this.ctx.fx.sfx.defeat();
-        this.ctx.recordResult('LOSS', { summary: 'Bot Won Connect 4' });
-      }
+    const label = document.getElementById('c4TurnStatus');
+    const sub = document.getElementById('c4SubStatus');
+    if (label) label.textContent = 'Game over';
+    if (sub) sub.textContent = result === 'DRAW' ? 'The board is full' : 'Four in a row';
+
+    if (result === 'DRAW') {
+      // let the last disc land before the dialog opens
+      this.ctx.scheduler.after(500, () => {
+        this.ctx.recordResult('DRAW', { counts: vsBot, summary: 'The board is full. Nobody won.' });
+      });
+      return;
     }
 
-    this.updateScoreboard();
+    winLine?.forEach(({ r, c }) => {
+      document.querySelector(`.c4-slot[data-r="${r}"][data-c="${c}"]`)?.classList.add('c4-win');
+    });
 
-    setTimeout(() => {
-      this.start({ mode: this.mode });
-    }, 2200);
+    this.ctx.scheduler.after(900, () => {
+      if (result === 'RED') {
+        this.ctx.recordResult('WIN', { counts: vsBot, summary: vsBot ? 'You got four in a row.' : 'Red got four in a row.' });
+      } else {
+        this.ctx.recordResult('LOSS', { counts: vsBot, summary: vsBot ? 'The bot got four in a row.' : 'Yellow got four in a row.' });
+      }
+    });
   },
 
   renderDisc(r, c, player) {
@@ -281,18 +261,18 @@ export default {
 
     const disc = slot.querySelector('.c4-disc');
     if (disc) {
-      disc.style.background = (player === 'RED') ? '#f85149' : '#d29922';
+      disc.classList.add(player === 'RED' ? 'red' : 'yellow');
       disc.style.transform = 'translateY(0%)';
     }
   },
 
   resetBoardVisuals() {
     document.querySelectorAll('.c4-slot').forEach(slot => {
-      slot.style.outline = 'none';
+      slot.classList.remove('c4-win');
       const disc = slot.querySelector('.c4-disc');
       if (disc) {
+        disc.className = 'c4-disc';
         disc.style.transform = 'translateY(-120%)';
-        disc.style.background = 'transparent';
       }
     });
   },
@@ -302,32 +282,20 @@ export default {
     const sub = document.getElementById('c4SubStatus');
     if (!label) return;
 
-    const colorHex = (this.currentPlayer === 'RED') ? 'var(--status-loss)' : 'var(--status-coin)';
-    label.style.color = colorHex;
+    const red = this.currentPlayer === 'RED';
 
     if (this.mode === 'VS_BOT') {
-      label.textContent = (this.currentPlayer === 'RED') ? 'Your turn (Red)' : 'Bot turn (Yellow)';
-      if (sub) sub.textContent = (this.currentPlayer === 'RED') ? 'Pick a column to drop' : 'Bot is thinking...';
+      label.textContent = red ? 'Your turn (red)' : "Bot's turn (yellow)";
+      if (sub) sub.textContent = red ? 'Pick a column' : 'Thinking...';
     } else {
-      label.textContent = (this.currentPlayer === 'RED') ? 'Player 1 (Red)' : 'Player 2 (Yellow)';
-      if (sub) sub.textContent = 'Pass to player ' + (this.currentPlayer === 'RED' ? '1' : '2');
+      label.textContent = red ? 'Player 1 (red)' : 'Player 2 (yellow)';
+      if (sub) sub.textContent = 'Pass the phone after your move';
     }
-  },
-
-  updateScoreboard() {
-    const r = document.getElementById('c4ScoreRed');
-    const t = document.getElementById('c4ScoreTies');
-    const y = document.getElementById('c4ScoreYellow');
-    if (r) r.textContent = this.seriesScore.red;
-    if (t) t.textContent = this.seriesScore.ties;
-    if (y) y.textContent = this.seriesScore.yellow;
   },
 
   pause() { this.isLocked = true; },
   resume() { if (!this.isGameOver) this.isLocked = false; },
   restart() {
-    this.seriesScore = { red: 0, yellow: 0, ties: 0 };
-    this.updateScoreboard();
     this.start({ mode: this.mode });
   },
   destroy() { this.container = null; }

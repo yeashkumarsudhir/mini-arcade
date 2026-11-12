@@ -1,6 +1,10 @@
-const CACHE_NAME = 'mini-arcade-cache-v6';
+// sw.js: makes the site work offline.
+// Pages: try the network first, fall back to the saved copy. Files: saved copy first, refreshed in the background.
+// Change CACHE_NAME whenever you change a file, or people keep seeing the old version.
 
-const PRECACHE_MANIFEST = [
+const CACHE_NAME = 'mini-arcade-v6';
+
+const FILES = [
   './',
   './index.html',
   './offline.html',
@@ -12,7 +16,7 @@ const PRECACHE_MANIFEST = [
   './icons/icon-512.png',
   './icons/maskable-512.png',
   './js/app.js',
-  './js/analytics.js',
+  './js/stats.js',
   './js/fx.js',
   './js/core/bus.js',
   './js/core/store.js',
@@ -23,7 +27,8 @@ const PRECACHE_MANIFEST = [
   './js/core/router.js',
   './js/core/haptics.js',
   './js/core/storage.js',
-  './js/core/i18n.js',
+  './js/core/savegame.js',
+  './js/core/theme.js',
   './js/games/ludo.js',
   './js/games/ludo-rules.js',
   './js/games/ludo-ai.js',
@@ -43,11 +48,11 @@ const PRECACHE_MANIFEST = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
-      for (const asset of PRECACHE_MANIFEST) {
+      for (const file of FILES) {
         try {
-          await cache.add(asset);
+          await cache.add(file);
         } catch (err) {
-          console.warn(`[ServiceWorker] Skipped caching: ${asset}`, err);
+          console.warn('Could not cache', file, err);
         }
       }
     })
@@ -57,51 +62,39 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then(() => self.clients.claim())
   );
-});
-
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
 });
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
-
   if (req.method !== 'GET') return;
 
   if (req.mode === 'navigate') {
     event.respondWith(
-      fetch(req).catch(() => {
-        return caches.match('./offline.html', { ignoreSearch: true });
+      fetch(req).catch(async () => {
+        // offline: the saved home page still runs the whole arcade
+        return (await caches.match('./index.html')) || caches.match('./offline.html');
       })
     );
     return;
   }
 
   event.respondWith(
-    caches.match(req, { ignoreSearch: true }).then((cachedResponse) => {
-      const fetchPromise = fetch(req).then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200) {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(req, responseToCache);
-          });
-        }
-        return networkResponse;
-      }).catch(() => cachedResponse);
+    caches.match(req, { ignoreSearch: true }).then((saved) => {
+      const fresh = fetch(req)
+        .then((res) => {
+          if (res && res.status === 200) {
+            const copy = res.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+          }
+          return res;
+        })
+        .catch(() => saved);
 
-      return cachedResponse || fetchPromise;
+      return saved || fresh;
     })
   );
 });

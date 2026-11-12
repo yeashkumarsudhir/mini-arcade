@@ -1,20 +1,24 @@
+// memory.js: 16 cards, 8 pairs. Standard mode or a 60 second Blitz.
+// The card pictures are small inline SVGs so they look the same on every phone.
+const shape = (inner) => `<svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">${inner}</svg>`;
+
 export default {
   id: 'memory',
-  title: 'Memory Match',
-  accent: '#2f81f7',
+  title: 'Memory',
+  accent: '#f2b705',
 
   ctx: null,
   container: null,
 
   GLYPHS: [
-    { id: 'alpha', label: 'A' },
-    { id: 'beta', label: 'B' },
-    { id: 'gamma', label: 'C' },
-    { id: 'delta', label: 'D' },
-    { id: 'epsilon', label: 'E' },
-    { id: 'zeta', label: 'F' },
-    { id: 'eta', label: 'G' },
-    { id: 'theta', label: 'H' }
+    { id: 'circle', icon: shape('<circle cx="12" cy="12" r="8" fill="#3d63e0" stroke="currentColor" stroke-width="1.6"/>') },
+    { id: 'square', icon: shape('<rect x="4.5" y="4.5" width="15" height="15" rx="3" fill="#d8504e" stroke="currentColor" stroke-width="1.6"/>') },
+    { id: 'triangle', icon: shape('<path d="M12 4l9 16H3z" fill="#3fa66a" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>') },
+    { id: 'star', icon: shape('<path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.5 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z" fill="#f2b705" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>') },
+    { id: 'diamond', icon: shape('<path d="M12 3l8 9-8 9-8-9z" fill="#e8893c" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>') },
+    { id: 'ring', icon: shape('<circle cx="12" cy="12" r="7" fill="none" stroke="#8b6fe0" stroke-width="4.5"/>') },
+    { id: 'cross', icon: shape('<path d="M9 4h6v5h5v6h-5v5H9v-5H4V9h5z" fill="#2fb0b0" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>') },
+    { id: 'drop', icon: shape('<path d="M12 3c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11z" fill="#d8508e" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>') }
   ],
 
   cards: [],
@@ -32,46 +36,46 @@ export default {
 
     this.container.innerHTML = `
       <div class="arena-dual-layout">
-        <div class="arena-board-frame" id="memoryBoardWrapper" style="position:relative;">
-          <div id="memoryMatrixGrid" style="display:grid; grid-template-columns:repeat(4, 68px); grid-template-rows:repeat(4, 68px); gap:8px;">
+        <div class="arena-board-frame" id="memoryBoardWrapper" style="position:relative; padding:10px;">
+          <div id="memoryMatrixGrid" style="display:grid; grid-template-columns:repeat(4, 1fr); grid-template-rows:repeat(4, 1fr); gap:8px; width:min(calc(100vw - 54px), 330px); aspect-ratio:1;">
             ${Array(16).fill(0).map((_, i) => `
-              <button type="button" class="btn-nav-pill memory-card-btn" data-idx="${i}" aria-label="Card ${i + 1}" style="height:100%; width:100%; padding:0; justify-content:center; border-radius:6px; border:1px solid var(--border-line); font-size:1.3rem; font-weight:700; cursor:pointer; background:var(--bg-surface);">
-                <span class="card-back" style="font-size:0.9rem; color:var(--text-dim);">?</span>
-                <span class="card-front" style="display:none;"></span>
+              <button type="button" class="memory-card-btn" data-idx="${i}" aria-label="Card ${i + 1}">
+                <span class="card-back">?</span>
+                <span class="card-front"></span>
               </button>
             `).join('')}
           </div>
-          <div id="memoryPauseShield" style="display:none; position:absolute; inset:0; background:var(--bg-panel); border-radius:8px; align-items:center; justify-content:center; font-weight:700; color:var(--text-dim); font-size:0.9rem;">
-            PAUSED
+          <div id="memoryPauseShield" style="display:none; position:absolute; inset:0; background:var(--bg-panel); border-radius:var(--radius-card); align-items:center; justify-content:center; font-family:var(--font-hand); font-weight:700; font-size:1.2rem; color:var(--text-dim);">
+            Paused
           </div>
         </div>
 
         <div class="arena-side-controls">
-          <div class="telemetry-cell" style="padding:12px;">
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; text-align:center;">
+          <div class="stat-box">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; text-align:center;">
               <div>
-                <span class="t-label">Moves</span>
-                <div id="memoryMovesDisplay" class="t-val" style="font-size:1.6rem; margin-top:2px; color:var(--brand-accent);">0</div>
+                <span class="stat-label">Moves</span>
+                <div id="memoryMovesDisplay" class="stat-value" style="font-size:1.8rem;">0</div>
               </div>
               <div>
-                <span class="t-label">Time Left</span>
-                <div id="memoryTimeDisplay" class="t-val" style="font-size:1.6rem; margin-top:2px;">--</div>
+                <span class="stat-label">Time left</span>
+                <div id="memoryTimeDisplay" class="stat-value" style="font-size:1.8rem;">No limit</div>
               </div>
             </div>
           </div>
 
-          <div class="telemetry-cell" style="gap:6px;">
-            <span class="t-label">Mode</span>
-            <div style="display:flex; gap:6px;">
-              <button type="button" class="btn-nav-pill" id="btnMemoryStandard" style="flex:1; justify-content:center; border-color:var(--brand-accent);">Standard</button>
-              <button type="button" class="btn-nav-pill" id="btnMemoryBlitz" style="flex:1; justify-content:center;">60s Timer</button>
+          <div class="stat-box" style="gap:8px;">
+            <span class="stat-label">Mode</span>
+            <div style="display:flex; gap:8px;">
+              <button type="button" class="btn-nav-pill is-on" id="btnMemoryStandard" style="flex:1;">Standard</button>
+              <button type="button" class="btn-nav-pill" id="btnMemoryBlitz" style="flex:1;">Blitz (60s)</button>
             </div>
           </div>
 
-          <div class="telemetry-cell" style="text-align:center; padding:10px;">
-            <p style="font-size:0.75rem; color:var(--text-sub); line-height:1.35;">
-              Clear all 8 matching pairs in as few moves as possible.
-            </p>
+          <div class="stat-box" style="text-align:center;">
+            <span class="stat-label">Rating</span>
+            <div id="memoryStarRating" class="stat-value">3 stars</div>
+            <div class="stat-label">12 moves or fewer gets 3 stars</div>
           </div>
         </div>
       </div>
@@ -91,13 +95,16 @@ export default {
     const btnStandard = document.getElementById('btnMemoryStandard');
     const btnBlitz = document.getElementById('btnMemoryBlitz');
     if (btnStandard && btnBlitz) {
-      btnStandard.style.borderColor = !this.isBlitz ? 'var(--brand-accent)' : 'var(--border-line)';
-      btnBlitz.style.borderColor = this.isBlitz ? 'var(--brand-accent)' : 'var(--border-line)';
+      btnStandard.classList.toggle('is-on', !this.isBlitz);
+      btnBlitz.classList.toggle('is-on', this.isBlitz);
     }
 
-    const deck = [...this.GLYPHS, ...this.GLYPHS]
-      .sort(() => Math.random() - 0.5)
-      .map(item => ({ ...item, isFlipped: false, isMatched: false }));
+    // Fisher-Yates shuffle (sort with random() gives an uneven shuffle)
+    const deck = [...this.GLYPHS, ...this.GLYPHS].map(item => ({ ...item, isFlipped: false, isMatched: false }));
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
 
     this.cards = deck;
 
@@ -134,7 +141,7 @@ export default {
     card.isFlipped = true;
     this.flippedIndices.push(idx);
     this.updateCardDOM(idx, true);
-    this.ctx.fx.playTone(540, 'triangle', 0.03, 0.08);
+    this.ctx.fx.playTone(540, 'triangle', 0.04, 0.1);
 
     if (this.flippedIndices.length === 2) {
       this.moves++;
@@ -159,7 +166,7 @@ export default {
           this.handleVictory();
         }
       } else {
-        this.ctx.scheduler.after(650, () => {
+        this.ctx.scheduler.after(700, () => {
           first.isFlipped = false;
           second.isFlipped = false;
           this.updateCardDOM(firstIdx, false);
@@ -178,29 +185,19 @@ export default {
     const back = cardEl.querySelector('.card-back');
     const front = cardEl.querySelector('.card-front');
 
-    if (isFlipped) {
-      cardEl.style.background = 'var(--bg-panel)';
-      cardEl.style.borderColor = 'var(--brand-accent)';
-      if (back) back.style.display = 'none';
-      if (front) {
-        front.textContent = this.cards[idx].label;
-        front.style.display = 'block';
-      }
-    } else {
-      cardEl.style.background = 'var(--bg-surface)';
-      cardEl.style.borderColor = 'var(--border-line)';
-      if (back) back.style.display = 'block';
-      if (front) front.style.display = 'none';
+    cardEl.classList.toggle('flipped', isFlipped);
+    if (!isFlipped) cardEl.classList.remove('matched');
+
+    if (back) back.style.display = isFlipped ? 'none' : 'block';
+    if (front) {
+      front.innerHTML = isFlipped ? this.cards[idx].icon : '';
+      front.style.display = isFlipped ? 'block' : 'none';
     }
   },
 
   markCardsMatched(idx1, idx2) {
     [idx1, idx2].forEach(i => {
-      const el = document.querySelector(`.memory-card-btn[data-idx="${i}"]`);
-      if (el) {
-        el.style.borderColor = 'var(--status-win)';
-        el.style.background = 'rgba(46, 160, 67, 0.15)';
-      }
+      document.querySelector(`.memory-card-btn[data-idx="${i}"]`)?.classList.add('matched');
     });
   },
 
@@ -225,28 +222,34 @@ export default {
   updateStatsUI() {
     const movesEl = document.getElementById('memoryMovesDisplay');
     const timeEl = document.getElementById('memoryTimeDisplay');
+    const starsEl = document.getElementById('memoryStarRating');
 
     if (movesEl) movesEl.textContent = this.moves;
-    if (timeEl) timeEl.textContent = this.isBlitz ? `${this.timeRemaining}s` : '--';
+    if (timeEl) timeEl.textContent = this.isBlitz ? `${this.timeRemaining}s` : 'No limit';
+
+    if (starsEl) {
+      const stars = this.moves <= 12 ? 3 : this.moves <= 16 ? 2 : 1;
+      starsEl.textContent = stars === 1 ? '1 star' : `${stars} stars`;
+    }
   },
 
   handleVictory() {
     if (this.blitzIntervalId) this.ctx.scheduler.cancel(this.blitzIntervalId);
-    this.ctx.fx.sfx.victory();
+
+    const starCount = this.moves <= 12 ? 3 : this.moves <= 16 ? 2 : 1;
 
     this.ctx.recordResult('WIN', {
       moves: this.moves,
-      summary: `Cleared in ${this.moves} moves!`
+      summary: `All pairs found in ${this.moves} moves (${starCount} ${starCount === 1 ? 'star' : 'stars'}).`
     });
   },
 
   handleTimeoutDefeat() {
     this.isLocked = true;
-    this.ctx.fx.sfx.defeat();
 
     this.ctx.recordResult('LOSS', {
       moves: this.moves,
-      summary: 'Time ran out!'
+      summary: `Time ran out after ${this.moves} moves.`
     });
   },
 

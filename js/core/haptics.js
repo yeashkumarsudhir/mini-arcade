@@ -1,3 +1,4 @@
+// haptics.js: phone vibration, switched off by the haptics setting.
 import { SettingsStore } from './store.js';
 
 export const Haptics = {

@@ -1,3 +1,4 @@
+// router.js: very small hash router (#/, #/game/snake, #/profile).
 export class Router {
   constructor(routes = {}) {
     this.routes = routes;

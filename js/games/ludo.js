@@ -1,96 +1,49 @@
+// ludo.js: turn flow, setup and save/continue for Ludo.
+// The rules are in ludo-rules.js, the bots in ludo-ai.js and the drawing in ludo-render.js.
 import { LudoRules, LUDO_COLORS, LUDO_PALETTE } from './ludo-rules.js';
 import { LudoAI } from './ludo-ai.js';
 import { LudoRenderer } from './ludo-render.js';
+import { SaveGame } from '../core/savegame.js';
 import { FXEngine } from '../fx.js';
-import { ArcadeApp } from '../app.js';
 
-class SafeScheduler {
-  constructor() {
-    this.tasks = new Map();
-    this.idCounter = 0;
-    this.isPaused = false;
-  }
+const DICE_FACES = {
+  1: { x: 0, y: 0 },
+  2: { x: 0, y: -90 },
+  3: { x: -90, y: 0 },
+  4: { x: 90, y: 0 },
+  5: { x: 0, y: 90 },
+  6: { x: 0, y: 180 }
+};
 
-  after(ms, fn) {
-    const id = ++this.idCounter;
-    const task = {
-      fn,
-      remaining: ms,
-      targetTime: performance.now() + ms,
-      handle: null
-    };
+const titleCase = (word) => word.charAt(0) + word.slice(1).toLowerCase();
 
-    if (!this.isPaused) {
-      task.handle = setTimeout(() => {
-        this.tasks.delete(id);
-        fn();
-      }, ms);
-    }
-
-    this.tasks.set(id, task);
-    return id;
-  }
-
-  pauseAll() {
-    if (this.isPaused) return;
-    this.isPaused = true;
-    const now = performance.now();
-
-    for (const [, task] of this.tasks) {
-      if (task.handle) {
-        clearTimeout(task.handle);
-        task.handle = null;
-      }
-      task.remaining = Math.max(0, task.targetTime - now);
-    }
-  }
-
-  resumeAll() {
-    if (!this.isPaused) return;
-    this.isPaused = false;
-    const now = performance.now();
-
-    for (const [id, task] of this.tasks) {
-      task.targetTime = now + task.remaining;
-      task.handle = setTimeout(() => {
-        this.tasks.delete(id);
-        task.fn();
-      }, task.remaining);
-    }
-  }
-
-  cancelAll() {
-    for (const [, task] of this.tasks) {
-      if (task.handle) clearTimeout(task.handle);
-    }
-    this.tasks.clear();
-  }
-
-  cancel(id) {
-    const task = this.tasks.get(id);
-    if (task && task.handle) clearTimeout(task.handle);
-    this.tasks.delete(id);
-  }
+function freshTokens() {
+  return {
+    RED: [-1, -1, -1, -1],
+    GREEN: [-1, -1, -1, -1],
+    YELLOW: [-1, -1, -1, -1],
+    BLUE: [-1, -1, -1, -1]
+  };
 }
 
 export const LudoGame = {
   id: 'ludo',
   title: 'Ludo',
-  accent: '#E53935',
+  accent: '#d8504e',
+  vsOpponent: true,
 
+  ctx: null,
   container: null,
   canvas: null,
   renderer: null,
-  scheduler: new SafeScheduler(),
   resizeObserver: null,
+  destroyed: false,
 
+  // fsm is one of: WAIT_ROLL, ROLLING, RESOLVE, WAIT_PICK, MOVING, GAME_OVER
   fsm: 'WAIT_ROLL',
-
   activeColor: 'RED',
-  humanColor: 'RED',
-  mode: 'CUSTOM',
   difficulty: 'Normal',
-  hopMs: 140,
+  hopMs: 150,
 
   autoMoveSingle: true,
   colorBlindAssist: false,
@@ -98,65 +51,58 @@ export const LudoGame = {
   diceValue: 1,
   consecutiveSixes: 0,
   isRolling: false,
+  flashText: '',
 
+  // who sits where, used by the Setup dialog
   lobbyConfig: {
-    playerCount: 4,
+    playerCount: 2,
     seats: [
-      { color: 'RED', active: true, isBot: false, name: 'Player 1' },
-      { color: 'GREEN', active: true, isBot: true, name: 'Bot 1' },
-      { color: 'YELLOW', active: true, isBot: true, name: 'Bot 2' },
-      { color: 'BLUE', active: true, isBot: true, name: 'Bot 3' }
+      { color: 'RED', active: true, isBot: false },
+      { color: 'GREEN', active: false, isBot: true },
+      { color: 'YELLOW', active: true, isBot: true },
+      { color: 'BLUE', active: false, isBot: true }
     ]
   },
 
-  state: {
-    tokens: {
-      RED: [-1, -1, -1, -1],
-      GREEN: [-1, -1, -1, -1],
-      YELLOW: [-1, -1, -1, -1],
-      BLUE: [-1, -1, -1, -1]
-    },
-    consecutiveSixes: 0,
-    finishRank: []
-  },
+  state: { tokens: freshTokens(), finishRank: [] },
 
   players: [],
   legalMoves: [],
   selectedTokenIdx: null,
   hoverCell: null,
   effects: [],
-
   animatingHop: null,
   rAFId: null,
+  lastStable: null,
   matchEndedCalled: false,
 
-  mount(el) {
+  mount(el, ctx) {
     this.container = el;
+    this.ctx = ctx;
+    this.destroyed = false;
     this.matchEndedCalled = false;
-    this.scheduler = new SafeScheduler();
 
     this.container.innerHTML = `
-      <div class="ludo-tabletop-container" id="ludoTableContainer" style="display:flex; flex-direction:column; align-items:center; width:100%; max-width:540px; margin:0 auto; gap:8px;">
-        <div class="ludo-board-frame" id="ludoBoardFrame" style="width:100%; display:flex; justify-content:center;">
-          <canvas id="ludoCanvas" width="540" height="540" style="max-width:100%; height:auto; touch-action:none; border-radius:6px;"></canvas>
+      <div class="ludo-tabletop-container">
+        <div class="ludo-board-frame" id="ludoBoardFrame">
+          <canvas id="ludoCanvas" width="540" height="540"></canvas>
         </div>
 
-        <div class="ludo-deck-controls" style="width:100%; display:flex; flex-direction:column; gap:8px;">
-          <div class="ludo-players-grid" id="ludoPlayerSlots" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(110px, 1fr)); gap:6px;"></div>
+        <div class="ludo-deck-controls">
+          <div class="ludo-players-grid" id="ludoPlayerSlots"></div>
 
-          <div style="text-align:center; padding:8px 10px; background:var(--bg-surface); border:1px solid var(--border-line); border-radius:6px;">
-            <div id="ludoStatusLine" style="font-size:1rem; font-weight:700; color:var(--ludo-red, #E53935);" aria-live="polite">
-              Starting match...
+          <div class="stat-box ludo-status">
+            <div class="ludo-status-line">
+              <span class="ludo-turn-dot" id="ludoTurnDot"></span>
+              <span class="stat-value" id="ludoStatusLine" aria-live="polite">Starting...</span>
             </div>
-            <div id="ludoSubNotice" style="font-size:0.75rem; color:var(--text-dim); margin-top:2px;">
-              Roll the dice or press Space
-            </div>
+            <div class="ludo-sub-notice" id="ludoSubNotice"></div>
           </div>
 
           <div class="ludo-dice-tray" id="ludoDiceTray">
-            <div class="ludo-roll-again-badge" id="ludoRollAgainBadge">ROLL AGAIN</div>
+            <div class="ludo-roll-again-badge" id="ludoRollAgainBadge">Roll again!</div>
 
-            <div class="ludo-dice-viewport" id="ludoDiceViewport" role="button" tabindex="0" aria-label="Roll Dice">
+            <div class="ludo-dice-viewport" id="ludoDiceViewport" role="button" tabindex="0" aria-label="Roll the dice">
               <div class="ludo-dice-shadow" id="ludoDiceShadow"></div>
               <div class="ludo-dice-cube" id="ludoDiceCube">
                 <div class="ludo-dice-face face-1"><span class="ludo-pip red-pip"></span></div>
@@ -168,287 +114,333 @@ export const LudoGame = {
               </div>
             </div>
 
-            <div style="display:flex; width:100%; gap:8px;">
-              <button type="button" class="btn-cta-primary" id="btnRollDiceDirect" style="flex:2; height:40px; font-size:0.85rem; font-weight:600;">
-                Roll Dice (Space)
-              </button>
-              <button type="button" id="btnOpenLobbyModal" class="btn-cta-secondary show" style="flex:1; height:40px; font-size:0.8rem; font-weight:600; cursor:pointer;">
-                Setup
-              </button>
+            <div class="ludo-tray-buttons">
+              <button type="button" class="btn-cta-primary" id="btnRollDiceDirect">Roll dice</button>
+              <button type="button" class="btn-cta-secondary" id="btnOpenLobbyModal">Setup</button>
             </div>
           </div>
 
-          <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:var(--bg-surface); border:1px solid var(--border-line); border-radius:6px;">
-            <label style="display:flex; align-items:center; gap:6px; font-size:0.75rem; cursor:pointer;">
-              <input type="checkbox" id="chkAutoMove" checked> Auto-move single
-            </label>
-            <label style="display:flex; align-items:center; gap:6px; font-size:0.75rem; cursor:pointer;">
-              <input type="checkbox" id="chkColorBlind"> Numbers on pawns
-            </label>
+          <div class="stat-box ludo-switches">
+            <label class="ludo-check"><input type="checkbox" id="chkAutoMove" checked> Auto-move when there is one choice</label>
+            <label class="ludo-check"><input type="checkbox" id="chkColorBlind"> Show numbers on pawns</label>
           </div>
         </div>
 
-        <div id="ludoLobbyModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:9999; justify-content:center; align-items:center; padding:16px;">
-          <div style="background:var(--bg-panel); border:1px solid var(--border-line); border-radius:8px; max-width:400px; width:100%; padding:16px; display:flex; flex-direction:column; gap:12px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <h3 style="margin:0; font-size:1rem; font-weight:700;">Match Setup</h3>
-              <button type="button" id="btnCloseLobbyModal" style="background:none; border:none; font-size:1.3rem; cursor:pointer; color:var(--text-main);">&times;</button>
-            </div>
+        <dialog id="ludoSetupDialog" class="sheet">
+          <div class="dialog-card">
+            <h2>Match setup</h2>
 
-            <div>
-              <span style="display:block; font-size:0.75rem; font-weight:700; color:var(--text-sub); margin-bottom:6px;">Players</span>
-              <div class="ludo-pill-selector" id="ludoPlayerCountPills">
-                <button type="button" class="ludo-pill-btn" data-count="2">2 Players</button>
-                <button type="button" class="ludo-pill-btn" data-count="3">3 Players</button>
-                <button type="button" class="ludo-pill-btn active" data-count="4">4 Players</button>
+            <div class="opt-group">
+              <span class="opt-label">Players</span>
+              <div class="seg" id="ludoPlayerCountPills">
+                <button type="button" class="seg-btn" data-count="2">2</button>
+                <button type="button" class="seg-btn" data-count="3">3</button>
+                <button type="button" class="seg-btn" data-count="4">4</button>
               </div>
             </div>
 
-            <div>
-              <span style="display:block; font-size:0.75rem; font-weight:700; color:var(--text-sub); margin-bottom:6px;">Seats</span>
-              <div id="ludoSeatsContainer" style="display:grid; grid-template-columns:1fr 1fr; gap:6px;"></div>
+            <div class="opt-group">
+              <span class="opt-label">Who plays each colour</span>
+              <div class="ludo-seat-config-grid" id="ludoSeatsContainer"></div>
             </div>
 
-            <button type="button" class="btn-cta-primary" id="btnStartLobbyGame" style="height:40px; width:100%; font-size:0.85rem; font-weight:600;">
-              Start Match
-            </button>
+            <div class="opt-group">
+              <span class="opt-label">Bot level</span>
+              <div class="seg" id="ludoLevelPills">
+                <button type="button" class="seg-btn" data-level="Easy">Easy</button>
+                <button type="button" class="seg-btn" data-level="Normal">Normal</button>
+                <button type="button" class="seg-btn" data-level="Hard">Hard</button>
+              </div>
+            </div>
+
+            <div class="dialog-actions-row">
+              <button type="button" class="btn-dialog-secondary" id="btnCloseLobbyModal">Cancel</button>
+              <button type="button" class="btn-dialog-primary" id="btnStartLobbyGame">Start new match</button>
+            </div>
           </div>
-        </div>
+        </dialog>
       </div>
     `;
 
     this.canvas = document.getElementById('ludoCanvas');
     this.renderer = new LudoRenderer(this.canvas);
-    window.LudoGameInstance = this;
 
     this.bindEvents();
     this.setupResizeObserver();
     this.startRenderLoop();
   },
 
+  /* ---------- starting, setup and loading ---------- */
+
+  // options can be: resume, playerCount, mode ('vs_bot' or 'pass_play'), difficulty, seats
   start(opts = {}) {
     this.matchEndedCalled = false;
     this.consecutiveSixes = 0;
-    this.fsm = 'WAIT_ROLL';
-    this.isRolling = false;
     this.animatingHop = null;
     this.legalMoves = [];
     this.selectedTokenIdx = null;
+    this.isRolling = false;
+    this.flashText = '';
 
-    if (opts.resumeSave && this.loadSavedState()) {
-      this.renderPlayerSlots();
-      this.syncUI();
-      this.setDiceFace(this.diceValue || 1);
-      if (this.getCurrentPlayer().isBot) {
-        this.scheduler.after(500, () => this.triggerBotCycle());
+    if (opts.resume) {
+      const snap = SaveGame.read('ludo');
+      if (LudoRules.isValidSnapshot(snap)) {
+        this.restoreFromSnapshot(snap);
+        return;
       }
-      return;
+      this.ctx.toast('The saved game could not be loaded. Starting a new one.');
     }
 
-    if (opts.customPlayers && Array.isArray(opts.customPlayers)) {
-      this.players = opts.customPlayers;
-    } else {
-      this.players = this.buildPlayersFromLobby();
-    }
+    this.applySetup(opts);
+    this.players = this.lobbyConfig.seats
+      .filter(seat => seat.active)
+      .map(seat => ({ color: seat.color, isBot: seat.isBot }));
 
-    this.humanColor = this.players.find(p => !p.isBot)?.color || this.players[0].color;
     this.activeColor = this.players[0].color;
-
-    this.state = {
-      tokens: {
-        RED: [-1, -1, -1, -1],
-        GREEN: [-1, -1, -1, -1],
-        YELLOW: [-1, -1, -1, -1],
-        BLUE: [-1, -1, -1, -1]
-      },
-      consecutiveSixes: 0,
-      finishRank: []
-    };
+    this.state = { tokens: freshTokens(), finishRank: [] };
+    this.fsm = 'WAIT_ROLL';
+    this.diceValue = 1;
 
     this.renderPlayerSlots();
     this.syncUI();
     this.setDiceFace(1);
+    this.captureStable();
 
     if (this.getCurrentPlayer().isBot) {
-      this.scheduler.after(500, () => this.triggerBotCycle());
+      this.ctx.scheduler.after(500, () => this.triggerBotCycle());
     }
   },
 
-  saveState() {
-    try {
-      const payload = {
-        state: this.state,
-        activeColor: this.activeColor,
-        diceValue: this.diceValue,
-        consecutiveSixes: this.consecutiveSixes,
-        players: this.players,
-        humanColor: this.humanColor,
-        difficulty: this.difficulty,
-        lobbyConfig: this.lobbyConfig
-      };
-      localStorage.setItem('parlour_ludo_autosave', JSON.stringify(payload));
-    } catch {}
-  },
+  applySetup(opts) {
+    if (opts.difficulty) this.difficulty = opts.difficulty;
 
-  loadSavedState() {
-    try {
-      const raw = localStorage.getItem('parlour_ludo_autosave');
-      if (!raw) return false;
-      const parsed = JSON.parse(raw);
-      if (!parsed || !parsed.state || !parsed.players) return false;
-
-      this.state = parsed.state;
-      this.activeColor = parsed.activeColor || 'RED';
-      this.diceValue = parsed.diceValue || 1;
-      this.consecutiveSixes = parsed.consecutiveSixes || 0;
-      this.players = parsed.players;
-      this.humanColor = parsed.humanColor || 'RED';
-      this.difficulty = parsed.difficulty || 'Normal';
-      if (parsed.lobbyConfig) this.lobbyConfig = parsed.lobbyConfig;
-      return true;
-    } catch {
-      return false;
+    if (Array.isArray(opts.seats)) {
+      this.lobbyConfig.seats = opts.seats.map(seat => ({ ...seat }));
+      this.lobbyConfig.playerCount = opts.seats.filter(seat => seat.active).length;
+      return;
     }
-  },
 
-  buildPlayersFromLobby() {
-    const activeSeats = this.lobbyConfig.seats.filter(s => s.active);
-    return activeSeats.map((seat, idx) => ({
-      color: seat.color,
-      isBot: seat.isBot,
-      name: seat.isBot ? `Bot (${seat.color})` : `P${idx + 1} (${seat.color})`
-    }));
-  },
-
-  openLobbyModal() {
-    const modal = document.getElementById('ludoLobbyModal');
-    if (!modal) return;
-    this.renderLobbySeats();
-    modal.style.display = 'flex';
-  },
-
-  closeLobbyModal() {
-    const modal = document.getElementById('ludoLobbyModal');
-    if (modal) modal.style.display = 'none';
-  },
-
-  renderLobbySeats() {
-    const container = document.getElementById('ludoSeatsContainer');
-    if (!container) return;
-
-    container.innerHTML = this.lobbyConfig.seats.map((seat) => {
-      const paletteColor = LUDO_PALETTE[seat.color];
-      return `
-        <div class="ludo-seat-card" style="padding:6px 8px; background:var(--bg-surface); border:1px solid var(--border-line); border-left:4px solid ${paletteColor}; border-radius:4px; opacity:${seat.active ? '1' : '0.4'};">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-            <strong style="color:${paletteColor}; font-size:0.75rem;">${seat.color}</strong>
-            <span style="font-size:0.65rem; color:var(--text-dim);">${seat.active ? 'Active' : 'Off'}</span>
-          </div>
-          <button type="button" class="btn-seat-toggle" data-color="${seat.color}" ${!seat.active ? 'disabled' : ''} style="width:100%; font-size:0.75rem; padding:4px; border:1px solid var(--border-line); border-radius:4px; cursor:pointer; background:${seat.isBot ? 'var(--bg-panel)' : 'var(--brand-accent)'}; color:${seat.isBot ? 'var(--text-main)' : '#fff'}; font-weight:600;">
-            ${seat.isBot ? 'Bot (AI)' : 'Human'}
-          </button>
-        </div>
-      `;
-    }).join('');
-
-    container.querySelectorAll('.btn-seat-toggle').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const color = e.currentTarget.dataset.color;
-        const seat = this.lobbyConfig.seats.find(s => s.color === color);
-        if (seat) {
-          seat.isBot = !seat.isBot;
-          this.renderLobbySeats();
-        }
-      });
-    });
+    if (opts.playerCount) {
+      this.setPlayerCount(opts.playerCount);
+      const seats = this.lobbyConfig.seats;
+      if (opts.mode === 'pass_play') {
+        seats.forEach(seat => { seat.isBot = false; });
+      } else {
+        // first seat is you, the others are bots
+        seats.forEach((seat, i) => { seat.isBot = i > 0; });
+      }
+    }
   },
 
   setPlayerCount(count) {
-    this.lobbyConfig.playerCount = count;
+    const active = {
+      2: ['RED', 'YELLOW'],
+      3: ['RED', 'GREEN', 'YELLOW'],
+      4: LUDO_COLORS
+    }[count] || LUDO_COLORS;
 
-    if (count === 2) {
-      this.lobbyConfig.seats = [
-        { color: 'RED', active: true, isBot: false, name: 'P1 Red' },
-        { color: 'GREEN', active: false, isBot: true, name: 'Bot' },
-        { color: 'YELLOW', active: true, isBot: true, name: 'P2 Yellow' },
-        { color: 'BLUE', active: false, isBot: true, name: 'Bot' }
-      ];
-    } else if (count === 3) {
-      this.lobbyConfig.seats = [
-        { color: 'RED', active: true, isBot: false, name: 'P1 Red' },
-        { color: 'GREEN', active: true, isBot: true, name: 'P2 Green' },
-        { color: 'YELLOW', active: true, isBot: true, name: 'P3 Yellow' },
-        { color: 'BLUE', active: false, isBot: true, name: 'Bot' }
-      ];
-    } else {
-      this.lobbyConfig.seats = [
-        { color: 'RED', active: true, isBot: false, name: 'P1 Red' },
-        { color: 'GREEN', active: true, isBot: true, name: 'Bot Green' },
-        { color: 'YELLOW', active: true, isBot: true, name: 'Bot Yellow' },
-        { color: 'BLUE', active: true, isBot: true, name: 'Bot Blue' }
-      ];
-    }
+    this.lobbyConfig.playerCount = active.length;
+    this.lobbyConfig.seats = LUDO_COLORS.map((color, i) => ({
+      color,
+      active: active.includes(color),
+      isBot: i > 0
+    }));
+  },
 
-    document.querySelectorAll('#ludoPlayerCountPills .ludo-pill-btn').forEach(btn => {
-      btn.classList.toggle('active', parseInt(btn.dataset.count, 10) === count);
+  restoreFromSnapshot(snap) {
+    this.difficulty = snap.difficulty || 'Normal';
+    this.players = snap.players.map(p => ({ color: p.color, isBot: p.isBot }));
+    this.activeColor = snap.activeColor;
+    this.state = {
+      tokens: {
+        RED: [...snap.tokens.RED],
+        GREEN: [...snap.tokens.GREEN],
+        YELLOW: [...snap.tokens.YELLOW],
+        BLUE: [...snap.tokens.BLUE]
+      },
+      finishRank: [...snap.finishRank]
+    };
+    this.consecutiveSixes = snap.consecutiveSixes || 0;
+    this.diceValue = snap.diceValue;
+
+    // keep the Setup dialog in line with the game we loaded
+    const colors = this.players.map(p => p.color);
+    this.lobbyConfig.playerCount = colors.length;
+    this.lobbyConfig.seats = LUDO_COLORS.map(color => {
+      const player = this.players.find(p => p.color === color);
+      return { color, active: colors.includes(color), isBot: player ? player.isBot : true };
     });
 
-    this.renderLobbySeats();
+    this.fsm = 'WAIT_ROLL';
+    if (snap.phase === 'WAIT_PICK') {
+      this.legalMoves = LudoRules.getLegalMoves(this.state, this.activeColor, this.diceValue);
+      if (this.legalMoves.length > 0) {
+        this.fsm = 'WAIT_PICK';
+        this.selectedTokenIdx = this.legalMoves[0];
+      }
+    }
+
+    this.renderPlayerSlots();
+    this.syncUI();
+    this.setDiceFace(this.diceValue);
+    this.captureStable();
+
+    if (this.fsm === 'WAIT_ROLL' && this.getCurrentPlayer().isBot) {
+      this.ctx.scheduler.after(600, () => this.triggerBotCycle());
+    }
+  },
+
+  // The game is saved from the last moment where it was waiting for a roll or a pick.
+  // That way a save never lands in the middle of a pawn animation.
+  captureStable() {
+    this.lastStable = {
+      version: 1,
+      players: this.players.map(p => ({ color: p.color, isBot: p.isBot })),
+      activeColor: this.activeColor,
+      tokens: {
+        RED: [...this.state.tokens.RED],
+        GREEN: [...this.state.tokens.GREEN],
+        YELLOW: [...this.state.tokens.YELLOW],
+        BLUE: [...this.state.tokens.BLUE]
+      },
+      finishRank: [...this.state.finishRank],
+      diceValue: this.diceValue,
+      phase: this.fsm === 'WAIT_PICK' ? 'WAIT_PICK' : 'WAIT_ROLL',
+      consecutiveSixes: this.consecutiveSixes,
+      difficulty: this.difficulty
+    };
+  },
+
+  saveState() {
+    if (this.fsm === 'GAME_OVER' || !this.lastStable) return null;
+    return JSON.parse(JSON.stringify(this.lastStable));
   },
 
   getCurrentPlayer() {
     return this.players.find(p => p.color === this.activeColor) || this.players[0];
   },
 
+  humanCount() {
+    return this.players.filter(p => !p.isBot).length;
+  },
+
+  // "You" when there is one human, otherwise the colour name
+  displayName(player) {
+    const label = titleCase(player.color);
+    if (player.isBot) return `${label} bot`;
+    return this.humanCount() === 1 ? 'You' : label;
+  },
+
+  /* ---------- setup dialog ---------- */
+
+  openSetup() {
+    const dialog = document.getElementById('ludoSetupDialog');
+    if (!dialog || dialog.open) return;
+    this.ctx.scheduler.pause();
+    this.renderSetup();
+    this.ctx.ui.open(dialog);
+  },
+
+  closeSetup() {
+    this.ctx.ui.close(document.getElementById('ludoSetupDialog'));
+  },
+
+  renderSetup() {
+    document.querySelectorAll('#ludoPlayerCountPills .seg-btn').forEach(btn => {
+      btn.classList.toggle('is-on', Number(btn.dataset.count) === this.lobbyConfig.playerCount);
+    });
+    document.querySelectorAll('#ludoLevelPills .seg-btn').forEach(btn => {
+      btn.classList.toggle('is-on', btn.dataset.level === this.difficulty);
+    });
+
+    const box = document.getElementById('ludoSeatsContainer');
+    box.innerHTML = this.lobbyConfig.seats.map(seat => `
+      <div class="ludo-seat-card${seat.active ? '' : ' disabled'}" style="--seat-color:${LUDO_PALETTE[seat.color]}">
+        <span class="ludo-seat-name">${titleCase(seat.color)}</span>
+        <button type="button" class="btn-nav-pill btn-seat-toggle" data-color="${seat.color}" ${seat.active ? '' : 'disabled'}>
+          ${seat.isBot ? 'Bot' : 'Human'}
+        </button>
+      </div>
+    `).join('');
+  },
+
+  /* ---------- events ---------- */
+
   bindEvents() {
-    const handleRollTrigger = (e) => {
-      e?.preventDefault();
-      // Strict guard against double-taps and bot roll races
+    const rollIfPossible = () => {
       if (this.fsm === 'WAIT_ROLL' && !this.getCurrentPlayer().isBot && !this.isRolling) {
         this.executeRoll();
       }
     };
 
-    document.getElementById('ludoDiceViewport')?.addEventListener('click', handleRollTrigger);
-    document.getElementById('btnRollDiceDirect')?.addEventListener('click', handleRollTrigger);
+    const dice = document.getElementById('ludoDiceViewport');
+    dice.addEventListener('click', rollIfPossible);
+    dice.addEventListener('keydown', (e) => {
+      if (e.code === 'Enter') {
+        e.preventDefault();
+        rollIfPossible();
+      }
+    });
+    document.getElementById('btnRollDiceDirect').addEventListener('click', rollIfPossible);
 
-    document.getElementById('btnOpenLobbyModal')?.addEventListener('click', () => this.openLobbyModal());
-    document.getElementById('btnCloseLobbyModal')?.addEventListener('click', () => this.closeLobbyModal());
+    document.getElementById('btnOpenLobbyModal').addEventListener('click', () => this.openSetup());
+    document.getElementById('btnCloseLobbyModal').addEventListener('click', () => this.closeSetup());
+    document.getElementById('ludoSetupDialog').addEventListener('close', () => {
+      if (!this.destroyed && !this.ctx.ui.hasOpenDialogs()) this.ctx.scheduler.resume();
+    });
 
-    document.querySelectorAll('#ludoPlayerCountPills .ludo-pill-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        this.setPlayerCount(parseInt(e.currentTarget.dataset.count, 10));
+    document.getElementById('ludoPlayerCountPills').addEventListener('click', (e) => {
+      const btn = e.target.closest('.seg-btn');
+      if (!btn) return;
+      this.setPlayerCount(Number(btn.dataset.count));
+      this.renderSetup();
+    });
+
+    document.getElementById('ludoLevelPills').addEventListener('click', (e) => {
+      const btn = e.target.closest('.seg-btn');
+      if (!btn) return;
+      this.difficulty = btn.dataset.level;
+      this.renderSetup();
+    });
+
+    document.getElementById('ludoSeatsContainer').addEventListener('click', (e) => {
+      const btn = e.target.closest('.btn-seat-toggle');
+      if (!btn) return;
+      const seat = this.lobbyConfig.seats.find(s => s.color === btn.dataset.color);
+      if (seat) {
+        seat.isBot = !seat.isBot;
+        this.renderSetup();
+      }
+    });
+
+    document.getElementById('btnStartLobbyGame').addEventListener('click', () => {
+      this.closeSetup();
+      this.ctx.restartWith({
+        seats: this.lobbyConfig.seats.map(seat => ({ ...seat })),
+        difficulty: this.difficulty
       });
     });
 
-    document.getElementById('btnStartLobbyGame')?.addEventListener('click', () => {
-      this.closeLobbyModal();
-      this.restart();
-    });
-
-    document.getElementById('chkAutoMove')?.addEventListener('change', (e) => {
+    document.getElementById('chkAutoMove').addEventListener('change', (e) => {
       this.autoMoveSingle = e.target.checked;
     });
 
-    document.getElementById('chkColorBlind')?.addEventListener('change', (e) => {
+    document.getElementById('chkColorBlind').addEventListener('change', (e) => {
       this.colorBlindAssist = e.target.checked;
       this.renderer.setColorBlind(this.colorBlindAssist);
     });
 
+    // tap a pawn on the board
     this.canvas.addEventListener('pointerdown', (e) => {
       if (this.fsm !== 'WAIT_PICK' || this.getCurrentPlayer().isBot) return;
 
-      const rect = this.canvas.getBoundingClientRect();
-      const clickX = (e.clientX - rect.left) * (this.renderer.boardSize / rect.width);
-      const clickY = (e.clientY - rect.top) * (this.renderer.boardSize / rect.height);
+      const [x, y] = this.pointOnBoard(e);
       const cell = this.renderer.cellSize;
 
       for (const tokenIdx of this.legalMoves) {
-        const p = this.state.tokens[this.activeColor][tokenIdx];
-        const [gx, gy] = LudoRules.getGridCoordinates(this.activeColor, tokenIdx, p);
-        const cx = gx * cell + cell / 2;
-        const cy = gy * cell + cell / 2;
-        const dist = Math.hypot(clickX - cx, clickY - cy);
+        const progress = this.state.tokens[this.activeColor][tokenIdx];
+        const [gx, gy] = LudoRules.getGridCoordinates(this.activeColor, tokenIdx, progress);
+        const dist = Math.hypot(x - (gx * cell + cell / 2), y - (gy * cell + cell / 2));
 
         if (dist <= cell * 0.75) {
           this.commitMove(tokenIdx);
@@ -457,26 +449,25 @@ export const LudoGame = {
       }
     });
 
+    // show where a pawn would land when the mouse is over it
     this.canvas.addEventListener('pointermove', (e) => {
       if (this.fsm !== 'WAIT_PICK' || this.getCurrentPlayer().isBot) {
         this.hoverCell = null;
         return;
       }
 
-      const rect = this.canvas.getBoundingClientRect();
-      const px = (e.clientX - rect.left) * (this.renderer.boardSize / rect.width);
-      const py = (e.clientY - rect.top) * (this.renderer.boardSize / rect.height);
+      const [x, y] = this.pointOnBoard(e);
       const cell = this.renderer.cellSize;
 
       let found = null;
       for (const tokenIdx of this.legalMoves) {
-        const p = this.state.tokens[this.activeColor][tokenIdx];
-        const [gx, gy] = LudoRules.getGridCoordinates(this.activeColor, tokenIdx, p);
-        const dist = Math.hypot(px - (gx * cell + cell / 2), py - (gy * cell + cell / 2));
+        const progress = this.state.tokens[this.activeColor][tokenIdx];
+        const [gx, gy] = LudoRules.getGridCoordinates(this.activeColor, tokenIdx, progress);
+        const dist = Math.hypot(x - (gx * cell + cell / 2), y - (gy * cell + cell / 2));
 
         if (dist <= cell * 0.65) {
-          const targetP = (p === -1) ? 0 : p + this.diceValue;
-          found = LudoRules.getGridCoordinates(this.activeColor, tokenIdx, targetP);
+          const target = progress === -1 ? 0 : progress + this.diceValue;
+          found = LudoRules.getGridCoordinates(this.activeColor, tokenIdx, target);
           break;
         }
       }
@@ -485,16 +476,17 @@ export const LudoGame = {
 
     this.keyHandler = (e) => {
       if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
+      if (document.querySelector('dialog[open]')) return;
 
       if (e.code === 'Space') {
         e.preventDefault();
-        handleRollTrigger();
+        if (!e.repeat) rollIfPossible();
       } else if (e.code === 'ArrowRight' || e.code === 'ArrowLeft') {
         if (this.fsm === 'WAIT_PICK' && this.legalMoves.length > 0) {
           e.preventDefault();
-          const curIdx = this.legalMoves.indexOf(this.selectedTokenIdx);
-          const nextIdx = (curIdx + (e.code === 'ArrowRight' ? 1 : -1) + this.legalMoves.length) % this.legalMoves.length;
-          this.selectedTokenIdx = this.legalMoves[nextIdx];
+          const current = this.legalMoves.indexOf(this.selectedTokenIdx);
+          const step = e.code === 'ArrowRight' ? 1 : -1;
+          this.selectedTokenIdx = this.legalMoves[(current + step + this.legalMoves.length) % this.legalMoves.length];
         }
       } else if (e.code === 'Enter') {
         if (this.fsm === 'WAIT_PICK' && this.selectedTokenIdx !== null) {
@@ -506,12 +498,20 @@ export const LudoGame = {
     window.addEventListener('keydown', this.keyHandler);
   },
 
+  // pointer position in board units, whatever size the canvas is shown at
+  pointOnBoard(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    return [
+      (e.clientX - rect.left) * (this.renderer.boardSize / rect.width),
+      (e.clientY - rect.top) * (this.renderer.boardSize / rect.height)
+    ];
+  },
+
   setupResizeObserver() {
     this.resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        const frameW = entry.contentRect.width;
-        const targetSize = Math.max(300, Math.min(frameW, 540));
-        this.renderer.resize(targetSize);
+        const width = entry.contentRect.width;
+        this.renderer.resize(Math.max(240, Math.min(width, 540)));
       }
     });
 
@@ -519,103 +519,83 @@ export const LudoGame = {
     if (frame) this.resizeObserver.observe(frame);
   },
 
+  /* ---------- rolling ---------- */
+
   executeRoll() {
-    this.isRolling = true;
     this.fsm = 'ROLLING';
+    this.isRolling = true;
+    this.flashText = '';
     this.legalMoves = [];
     this.selectedTokenIdx = null;
+    this.syncUI();
 
     this.diceValue = Math.floor(Math.random() * 6) + 1;
-    try { FXEngine.diceRoll(); } catch {}
+    FXEngine.diceRoll();
 
     this.animateDiceTumble(this.diceValue, () => {
-      try { FXEngine.diceLand(); } catch {}
+      if (this.destroyed) return;
+      FXEngine.diceLand();
       this.isRolling = false;
       this.handlePostRoll();
     });
   },
 
-  animateDiceTumble(targetValue, onComplete) {
+  animateDiceTumble(value, onDone) {
     const cube = document.getElementById('ludoDiceCube');
     const shadow = document.getElementById('ludoDiceShadow');
     if (!cube) {
-      onComplete();
+      onDone();
       return;
     }
 
-    const faceRotations = {
-      1: { x: 0, y: 0 },
-      2: { x: 0, y: -90 },
-      3: { x: -90, y: 0 },
-      4: { x: 90, y: 0 },
-      5: { x: 0, y: 90 },
-      6: { x: 0, y: 180 }
-    };
-
-    const targetRot = faceRotations[targetValue] || faceRotations[1];
-    const extraTurnsX = (Math.floor(Math.random() * 2) + 2) * 360;
-    const extraTurnsY = (Math.floor(Math.random() * 2) + 2) * 360;
-
-    const endX = targetRot.x + extraTurnsX;
-    const endY = targetRot.y + extraTurnsY;
+    const end = DICE_FACES[value];
 
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      cube.style.transform = `rotateX(${targetRot.x}deg) rotateY(${targetRot.y}deg)`;
-      onComplete();
+      cube.style.transform = `rotateX(${end.x}deg) rotateY(${end.y}deg)`;
+      onDone();
       return;
     }
+
+    const endX = end.x + (Math.floor(Math.random() * 3) + 2) * 360;
+    const endY = end.y + (Math.floor(Math.random() * 3) + 2) * 360;
 
     const anim = cube.animate([
       { transform: 'translateY(0px) scale(1) rotateX(0deg) rotateY(0deg)' },
-      { transform: 'translateY(-24px) scale(1.12) rotateX(360deg) rotateY(180deg)', offset: 0.35 },
-      { transform: `translateY(-6px) scale(1.04) rotateX(${endX * 0.75}deg) rotateY(${endY * 0.75}deg)`, offset: 0.7 },
+      { transform: 'translateY(-28px) scale(1.15) rotateX(360deg) rotateY(180deg)', offset: 0.35 },
+      { transform: `translateY(-8px) scale(1.05) rotateX(${endX * 0.75}deg) rotateY(${endY * 0.75}deg)`, offset: 0.7 },
       { transform: `translateY(0px) scale(1) rotateX(${endX}deg) rotateY(${endY}deg)`, offset: 1 }
-    ], {
-      duration: 550,
-      easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
-      fill: 'forwards'
-    });
+    ], { duration: 650, easing: 'cubic-bezier(0.25, 1, 0.5, 1)', fill: 'forwards' });
 
-    if (shadow) {
-      shadow.animate([
-        { transform: 'scale(1)', opacity: 0.35 },
-        { transform: 'scale(0.6)', opacity: 0.15, offset: 0.35 },
-        { transform: 'scale(1)', opacity: 0.35, offset: 1 }
-      ], { duration: 550, fill: 'forwards' });
-    }
+    shadow?.animate([
+      { transform: 'scale(1)', opacity: 0.4 },
+      { transform: 'scale(0.6)', opacity: 0.15, offset: 0.35 },
+      { transform: 'scale(1)', opacity: 0.4, offset: 1 }
+    ], { duration: 650, fill: 'forwards' });
 
     anim.onfinish = () => {
-      cube.style.transform = `rotateX(${targetRot.x}deg) rotateY(${targetRot.y}deg)`;
-      onComplete();
+      anim.cancel();
+      cube.style.transform = `rotateX(${end.x}deg) rotateY(${end.y}deg)`;
+      onDone();
     };
   },
 
-  setDiceFace(val) {
+  setDiceFace(value) {
     const cube = document.getElementById('ludoDiceCube');
     if (!cube) return;
-    const faceRotations = {
-      1: { x: 0, y: 0 },
-      2: { x: 0, y: -90 },
-      3: { x: -90, y: 0 },
-      4: { x: 90, y: 0 },
-      5: { x: 0, y: 90 },
-      6: { x: 0, y: 180 }
-    };
-    const r = faceRotations[val] || faceRotations[1];
-    cube.style.transform = `rotateX(${r.x}deg) rotateY(${r.y}deg)`;
+    const face = DICE_FACES[value] || DICE_FACES[1];
+    cube.style.transform = `rotateX(${face.x}deg) rotateY(${face.y}deg)`;
   },
 
   handlePostRoll() {
-    const isSix = (this.diceValue === 6);
-    const badge = document.getElementById('ludoRollAgainBadge');
-    if (badge) badge.classList.toggle('show', isSix);
+    const isSix = this.diceValue === 6;
+    document.getElementById('ludoRollAgainBadge')?.classList.toggle('show', isSix);
 
     if (isSix) {
       this.consecutiveSixes++;
       if (this.consecutiveSixes === 3) {
         this.consecutiveSixes = 0;
-        this.showStatusNotification('Three 6s in a row! Turn skipped.');
-        this.scheduler.after(700, () => this.advanceTurn());
+        this.showStatus('Three 6s in a row. Turn lost.');
+        this.ctx.scheduler.after(900, () => this.advanceTurn());
         return;
       }
     } else {
@@ -626,225 +606,228 @@ export const LudoGame = {
 
     if (this.legalMoves.length === 0) {
       this.fsm = 'WAIT_ROLL';
-      this.showStatusNotification('No legal moves available');
-      this.scheduler.after(650, () => this.advanceTurn());
+      this.showStatus('No move possible');
+      this.ctx.scheduler.after(900, () => this.advanceTurn());
       return;
     }
 
-    const curPlayer = this.getCurrentPlayer();
+    const player = this.getCurrentPlayer();
 
-    if (curPlayer.isBot) {
+    if (player.isBot) {
       this.fsm = 'RESOLVE';
-      this.scheduler.after(400, () => {
-        const chosenToken = LudoAI.chooseMove(
-          this.difficulty,
-          this.activeColor,
-          this.state,
-          this.diceValue,
-          this.legalMoves,
-          this.players
-        );
-        this.commitMove(chosenToken);
+      this.ctx.scheduler.after(450, () => {
+        const pick = LudoAI.chooseMove(this.difficulty, this.activeColor, this.state, this.diceValue, this.legalMoves);
+        this.commitMove(pick);
       });
+    } else if (this.legalMoves.length === 1 && this.autoMoveSingle) {
+      this.fsm = 'RESOLVE';
+      this.selectedTokenIdx = this.legalMoves[0];
+      this.ctx.scheduler.after(300, () => this.commitMove(this.legalMoves[0]));
     } else {
-      if (this.legalMoves.length === 1 && this.autoMoveSingle) {
-        this.fsm = 'RESOLVE';
-        this.selectedTokenIdx = this.legalMoves[0];
-        this.scheduler.after(250, () => this.commitMove(this.legalMoves[0]));
-      } else {
-        this.fsm = 'WAIT_PICK';
-        this.selectedTokenIdx = this.legalMoves[0];
-        this.syncUI();
-      }
+      this.fsm = 'WAIT_PICK';
+      this.selectedTokenIdx = this.legalMoves[0];
+      this.syncUI();
+      this.captureStable();
     }
   },
+
+  /* ---------- moving ---------- */
 
   commitMove(tokenIndex) {
     this.fsm = 'MOVING';
     this.hoverCell = null;
-    const startP = this.state.tokens[this.activeColor][tokenIndex];
-    const targetP = (startP === -1) ? 0 : startP + this.diceValue;
 
-    const waypoints = [];
-    if (startP === -1) {
-      waypoints.push(0);
+    const start = this.state.tokens[this.activeColor][tokenIndex];
+    const target = start === -1 ? 0 : start + this.diceValue;
+
+    const steps = [];
+    if (start === -1) {
+      steps.push(0);
     } else {
-      for (let s = startP + 1; s <= targetP; s++) {
-        waypoints.push(s);
-      }
+      for (let s = start + 1; s <= target; s++) steps.push(s);
     }
 
-    this.playStepHopAnimation(this.activeColor, tokenIndex, waypoints, 0);
+    this.playStepHopAnimation(this.activeColor, tokenIndex, steps, 0);
   },
 
-  playStepHopAnimation(color, tokenIdx, waypoints, waypointIndex) {
-    if (waypointIndex >= waypoints.length) {
+  playStepHopAnimation(color, tokenIdx, steps, stepIndex) {
+    if (this.destroyed) return;
+
+    if (stepIndex >= steps.length) {
       this.animatingHop = null;
-      this.finalizeMoveResolution(color, tokenIdx);
+      this.finalizeMove(color, tokenIdx);
       return;
     }
 
-    const nextStep = waypoints[waypointIndex];
-    const prevStep = waypointIndex === 0 ? this.state.tokens[color][tokenIdx] : waypoints[waypointIndex - 1];
-
-    const fromGrid = LudoRules.getGridCoordinates(color, tokenIdx, prevStep);
-    const toGrid = LudoRules.getGridCoordinates(color, tokenIdx, nextStep);
+    const next = steps[stepIndex];
+    const prev = stepIndex === 0 ? this.state.tokens[color][tokenIdx] : steps[stepIndex - 1];
 
     this.animatingHop = {
       color,
       tokenIndex: tokenIdx,
-      fromGrid,
-      toGrid,
+      fromGrid: LudoRules.getGridCoordinates(color, tokenIdx, prev),
+      toGrid: LudoRules.getGridCoordinates(color, tokenIdx, next),
       progress: 0
     };
 
-    try { FXEngine.tokenHop(); } catch {}
+    FXEngine.tokenHop();
 
-    const startTime = performance.now();
-    const duration = this.hopMs;
+    // time only counts while the game is not paused
+    let elapsed = 0;
+    let last = performance.now();
 
-    const hopStep = (now) => {
-      if (this.scheduler.isPaused) {
-        requestAnimationFrame(hopStep);
-        return;
-      }
+    const frame = (now) => {
+      if (this.destroyed) return;
 
-      const elapsed = now - startTime;
-      const t = Math.min(1, elapsed / duration);
-      if (this.animatingHop) {
-        this.animatingHop.progress = t;
-      }
+      if (!this.ctx.scheduler.isPaused) elapsed += now - last;
+      last = now;
+
+      const t = Math.min(1, elapsed / this.hopMs);
+      if (this.animatingHop) this.animatingHop.progress = t;
 
       if (t < 1) {
-        requestAnimationFrame(hopStep);
+        requestAnimationFrame(frame);
       } else {
-        this.state.tokens[color][tokenIdx] = nextStep;
-        this.playStepHopAnimation(color, tokenIdx, waypoints, waypointIndex + 1);
+        this.state.tokens[color][tokenIdx] = next;
+        this.playStepHopAnimation(color, tokenIdx, steps, stepIndex + 1);
       }
     };
-
-    requestAnimationFrame(hopStep);
+    requestAnimationFrame(frame);
   },
 
-  finalizeMoveResolution(color, tokenIdx) {
+  finalizeMove(color, tokenIdx) {
     const finalP = this.state.tokens[color][tokenIdx];
-    let extraTurn = (this.diceValue === 6);
+    let extraTurn = this.diceValue === 6;
 
-    const capture = LudoRules.checkCapture(this.state, color, finalP);
-    if (capture) {
-      this.state.tokens[capture.color][capture.tokenIndex] = -1;
+    const captured = LudoRules.checkCaptures(this.state, color, finalP);
+    if (captured.length > 0) {
+      for (const hit of captured) this.state.tokens[hit.color][hit.tokenIndex] = -1;
       extraTurn = true;
-      try { FXEngine.cutOpponent(); } catch {}
-      this.showStatusNotification(`${color} captured ${capture.color}!`);
+      FXEngine.cutOpponent();
+      const victims = [...new Set(captured.map(hit => titleCase(hit.color)))].join(' and ');
+      this.showStatus(`${titleCase(color)} captured ${victims}`);
     }
 
     if (finalP === 56) {
       extraTurn = true;
-      try { FXEngine.playTone(880, 'triangle', 0.1, 0.15); } catch {}
+      FXEngine.playTone(880, 'triangle', 0.1, 0.2);
 
-      const allHome = this.state.tokens[color].every(step => step === 56);
-      if (allHome) {
-        if (!this.state.finishRank.includes(color)) {
-          this.state.finishRank.push(color);
-        }
-        try { FXEngine.confetti(40); } catch {}
-
+      if (this.state.tokens[color].every(step => step === 56)) {
+        extraTurn = false;   // all four are home, this player is done
+        if (!this.state.finishRank.includes(color)) this.state.finishRank.push(color);
+        FXEngine.confetti(80);
         this.renderPlayerSlots();
 
-        if (this.state.finishRank.length >= this.players.length - 1) {
-          const humanRank = this.state.finishRank.indexOf(this.humanColor);
-          const didHumanWin = (humanRank === 0);
-          this.scheduler.after(400, () => this.concludeMatch(didHumanWin ? 'WIN' : 'LOSS'));
+        if (this.isMatchOver()) {
+          this.ctx.scheduler.after(400, () => this.concludeMatch());
           return;
         }
       }
     }
 
-    this.saveState();
-
     if (extraTurn) {
       this.fsm = 'WAIT_ROLL';
       this.syncUI();
+      this.captureStable();
       if (this.getCurrentPlayer().isBot) {
-        this.scheduler.after(550, () => this.triggerBotCycle());
+        this.ctx.scheduler.after(600, () => this.triggerBotCycle());
       }
     } else {
       this.advanceTurn();
     }
   },
 
+  // over when only one player is left, or when every human has finished
+  isMatchOver() {
+    const done = this.state.finishRank;
+    const humansLeft = this.players.filter(p => !p.isBot && !done.includes(p.color));
+    return done.length >= this.players.length - 1 || humansLeft.length === 0;
+  },
+
   advanceTurn() {
     const order = this.players.map(p => p.color);
-    let curIdx = order.indexOf(this.activeColor);
+    let i = order.indexOf(this.activeColor);
 
     do {
-      curIdx = (curIdx + 1) % order.length;
-      this.activeColor = order[curIdx];
+      i = (i + 1) % order.length;
+      this.activeColor = order[i];
     } while (this.state.finishRank.includes(this.activeColor));
 
     this.fsm = 'WAIT_ROLL';
     this.consecutiveSixes = 0;
     this.syncUI();
+    this.captureStable();
 
     if (this.getCurrentPlayer().isBot) {
-      this.scheduler.after(550, () => this.triggerBotCycle());
+      this.ctx.scheduler.after(600, () => this.triggerBotCycle());
     }
   },
 
   triggerBotCycle() {
-    if (this.fsm !== 'WAIT_ROLL' || !this.getCurrentPlayer().isBot || this.isRolling) return;
+    if (this.destroyed) return;
+    if (this.fsm !== 'WAIT_ROLL' || !this.getCurrentPlayer().isBot) return;
     this.executeRoll();
   },
 
-  showStatusNotification(text) {
-    const line = document.getElementById('ludoStatusLine');
-    if (line) line.textContent = text;
+  /* ---------- screen updates ---------- */
+
+  // a short message (capture, no move...) that stays until the next roll
+  showStatus(text) {
+    this.flashText = text;
+    const sub = document.getElementById('ludoSubNotice');
+    if (sub) sub.textContent = text;
   },
 
   syncUI() {
-    const curPlayer = this.getCurrentPlayer();
+    const player = this.getCurrentPlayer();
+    if (!player) return;
+
     const line = document.getElementById('ludoStatusLine');
     const sub = document.getElementById('ludoSubNotice');
+    const dot = document.getElementById('ludoTurnDot');
     const rollBtn = document.getElementById('btnRollDiceDirect');
+    const name = this.displayName(player);
 
     if (line) {
-      if (this.fsm === 'WAIT_ROLL') {
-        line.textContent = `${curPlayer.name}'s turn - roll dice`;
-      } else if (this.fsm === 'WAIT_PICK') {
-        line.textContent = `${curPlayer.name} - pick a pawn`;
-      }
-      line.style.color = LUDO_PALETTE[this.activeColor];
+      if (player.isBot) line.textContent = `${name}'s turn`;
+      else if (name === 'You') line.textContent = 'Your turn';
+      else line.textContent = `${name}'s turn`;
     }
 
     if (sub) {
-      sub.textContent = curPlayer.isBot ? 'Bot is thinking...' : 'Tap the dice or press Space';
+      if (this.flashText) sub.textContent = this.flashText;
+      else if (player.isBot) sub.textContent = 'Thinking...';
+      else if (this.fsm === 'WAIT_PICK') sub.textContent = 'Pick a pawn. Tap it, or use the arrow keys and Enter.';
+      else sub.textContent = 'Tap the dice or press Space.';
     }
+
+    if (dot) dot.style.background = LUDO_PALETTE[this.activeColor];
 
     if (rollBtn) {
-      rollBtn.disabled = curPlayer.isBot || this.fsm !== 'WAIT_ROLL';
-      rollBtn.textContent = curPlayer.isBot ? 'Bot Rolling...' : 'Roll Dice (Space)';
+      rollBtn.disabled = player.isBot || this.fsm !== 'WAIT_ROLL';
+      rollBtn.textContent = player.isBot ? 'Waiting...' : 'Roll dice';
     }
 
+    document.getElementById('ludoRollAgainBadge')?.classList.remove('show');
     this.renderPlayerSlots();
   },
 
   renderPlayerSlots() {
-    const container = document.getElementById('ludoPlayerSlots');
-    if (!container) return;
+    const box = document.getElementById('ludoPlayerSlots');
+    if (!box) return;
 
-    container.innerHTML = this.players.map(p => {
-      const isCur = (p.color === this.activeColor);
-      const pawns = this.state.tokens[p.color];
-      const finished = pawns.filter(step => step === 56).length;
-      const rankIdx = this.state.finishRank.indexOf(p.color);
-      const rankText = rankIdx !== -1 ? `(#${rankIdx + 1})` : `Home ${finished}/4`;
+    box.innerHTML = this.players.map(p => {
+      const home = this.state.tokens[p.color].filter(step => step === 56).length;
+      const place = this.state.finishRank.indexOf(p.color);
+      const info = place !== -1 ? `Finished #${place + 1}` : `${home} of 4 home`;
+      const active = p.color === this.activeColor && this.fsm !== 'GAME_OVER';
 
       return `
-        <div class="ludo-player-card ${isCur ? 'active' : ''}" style="display:flex; align-items:center; gap:6px; padding:6px; border:1px solid ${isCur ? LUDO_PALETTE[p.color] : 'var(--border-line)'}; border-radius:4px; background:${isCur ? 'var(--bg-surface-hover)' : 'var(--bg-panel)'};">
-          <span style="width:10px; height:10px; border-radius:50%; background:${LUDO_PALETTE[p.color]}; display:inline-block;"></span>
-          <div style="display:flex; flex-direction:column; line-height:1.2;">
-            <span style="font-size:0.75rem; font-weight:700; color:${isCur ? LUDO_PALETTE[p.color] : 'inherit'};">${p.name}</span>
-            <span style="font-size:0.65rem; color:var(--text-dim);">${rankText}</span>
+        <div class="ludo-player-card${active ? ' active' : ''}" style="--card-color:${LUDO_PALETTE[p.color]}">
+          <span class="ludo-player-dot"></span>
+          <div class="ludo-player-text">
+            <span class="ludo-player-name">${this.displayName(p)}</span>
+            <span class="ludo-player-info">${info}</span>
           </div>
         </div>
       `;
@@ -853,63 +836,64 @@ export const LudoGame = {
 
   startRenderLoop() {
     const frame = () => {
+      if (this.destroyed || !this.renderer) return;
+
       this.renderer.renderFrame(this.state, {
         activeColor: this.activeColor,
         legalMoves: this.legalMoves,
         animatingHop: this.animatingHop,
         selectedToken: this.selectedTokenIdx !== null ? { color: this.activeColor, index: this.selectedTokenIdx } : null,
-        hoverPreviewCell: this.hoverCell
+        hoverPreviewCell: this.hoverCell,
+        effects: this.effects
       });
-
       this.rAFId = requestAnimationFrame(frame);
     };
     this.rAFId = requestAnimationFrame(frame);
   },
 
-  concludeMatch(outcome) {
+  /* ---------- end of the match ---------- */
+
+  concludeMatch() {
     if (this.matchEndedCalled) return;
     this.matchEndedCalled = true;
     this.fsm = 'GAME_OVER';
+    this.renderPlayerSlots();
 
-    localStorage.removeItem('parlour_ludo_autosave');
+    const winner = this.state.finishRank[0];
+    const winnerPlayer = this.players.find(p => p.color === winner);
+    const humanWon = !!winnerPlayer && !winnerPlayer.isBot;
+    const hasBots = this.players.some(p => p.isBot);
 
-    let rank = this.state.finishRank.indexOf(this.humanColor) + 1;
-    if (rank === 0) {
-      rank = outcome === 'WIN' ? 1 : this.players.length;
+    let summary;
+    if (this.humanCount() === 1) {
+      const human = this.players.find(p => !p.isBot);
+      const place = this.state.finishRank.indexOf(human.color) + 1;
+      summary = place === 1
+        ? `You finished first out of ${this.players.length}.`
+        : `${titleCase(winner)} bot won. You finished ${place > 0 ? 'number ' + place : 'last'}.`;
+    } else {
+      summary = `${titleCase(winner)} won the match.`;
     }
 
-    const outcomePayload = {
-      summary: `Finished #${rank} (${this.difficulty} Match)`,
-      ranked: false
-    };
-
-    if (typeof ArcadeApp.triggerMatchEnd === 'function') {
-      ArcadeApp.triggerMatchEnd(outcome, outcomePayload);
-    } else if (typeof ArcadeApp.handleMatchOutcome === 'function') {
-      ArcadeApp.handleMatchOutcome(outcome, outcomePayload);
-    }
+    // a game between friends on one phone does not count in your scores
+    this.ctx.recordResult(humanWon ? 'WIN' : 'LOSS', { summary, counts: hasBots });
   },
 
-  pause() {
-    this.scheduler.pauseAll();
-  },
+  /* ---------- lifecycle ---------- */
 
-  resume() {
-    this.scheduler.resumeAll();
-  },
+  pause() {},
+
+  resume() {},
 
   restart() {
-    this.scheduler.cancelAll();
-    this.start();
+    this.start({});
   },
 
   destroy() {
-    this.scheduler.cancelAll();
+    this.destroyed = true;
     if (this.rAFId) cancelAnimationFrame(this.rAFId);
-    if (this.resizeObserver) this.resizeObserver.disconnect();
+    this.resizeObserver?.disconnect();
     if (this.keyHandler) window.removeEventListener('keydown', this.keyHandler);
-
-    delete window.LudoGameInstance;
 
     this.container = null;
     this.canvas = null;

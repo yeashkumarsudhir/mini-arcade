@@ -1,3 +1,7 @@
+// ludo-rules.js: the Ludo rules and board layout.
+// A pawn's "progress" is -1 in the yard, 0 to 50 on the shared track, 51 to 55 in its own
+// home column and 56 once it is home. The board is a 15 by 15 grid.
+
 export const LUDO_COLORS = ['RED', 'GREEN', 'YELLOW', 'BLUE'];
 
 export const LUDO_PALETTE = {
@@ -5,9 +9,9 @@ export const LUDO_PALETTE = {
   GREEN: '#43A047',
   YELLOW: '#FDD835',
   BLUE: '#1E88E5',
-  PAPER: '#FFFDF7',
-  INK: '#222222',
-  FRAME: '#2B1D16'
+  PAPER: '#FFFDF5',
+  INK: '#2B2B2B',
+  FRAME: '#22304A'
 };
 
 export const LUDO_CONFIG = {
@@ -87,7 +91,7 @@ export const LudoRules = {
     if (progress === 56) {
       return CENTER_GOAL_COORDINATES[color];
     }
-    throw new Error(`[LudoRules] Invalid progress step: ${progress}`);
+    throw new Error(`Invalid pawn progress: ${progress}`);
   },
 
   getTrackIndex(color, progress) {
@@ -99,7 +103,7 @@ export const LudoRules = {
     return trackIndex !== -1 && LUDO_CONFIG.SAFE_SQUARES.includes(trackIndex);
   },
 
-  getLegalMoves(gameState, color, roll) {
+  getLegalMoves(gameState, color, roll, options = { blockadeRule: false }) {
     if (roll < 1 || roll > 6) return [];
     const tokens = gameState.tokens[color];
     if (!tokens) return [];
@@ -109,20 +113,26 @@ export const LudoRules = {
     for (let i = 0; i < tokens.length; i++) {
       const p = tokens[i];
 
-      // Pawn in yard only comes out on 6
       if (p === -1) {
         if (roll === 6) {
-          legalIndices.push(i);
+          if (options.blockadeRule) {
+            const hasStartBlockade = this.isCellBlockaded(gameState, color, 0);
+            if (!hasStartBlockade) legalIndices.push(i);
+          } else {
+            legalIndices.push(i);
+          }
         }
         continue;
       }
 
-      // Already finished
       if (p === 56) continue;
 
-      // Exact number needed for step 56 (no overshoot)
       const targetProgress = p + roll;
       if (targetProgress > 56) continue;
+
+      if (options.blockadeRule && this.isPathBlocked(gameState, color, p, targetProgress)) {
+        continue;
+      }
 
       legalIndices.push(i);
     }
@@ -130,11 +140,14 @@ export const LudoRules = {
     return legalIndices;
   },
 
-  checkCapture(gameState, movingColor, targetProgress) {
-    if (targetProgress < 0 || targetProgress > 50) return null;
+  // Every opponent pawn on the square we land on is captured. If an opponent had two pawns
+  // stacked there, both go back to the yard, so two colours can never share a square.
+  checkCaptures(gameState, movingColor, targetProgress) {
+    const hits = [];
+    if (targetProgress < 0 || targetProgress > 50) return hits;
 
     const targetTrackIdx = this.getTrackIndex(movingColor, targetProgress);
-    if (this.isSafeSquare(targetTrackIdx)) return null;
+    if (this.isSafeSquare(targetTrackIdx)) return hits;
 
     for (const oppColor of LUDO_COLORS) {
       if (oppColor === movingColor) continue;
@@ -143,16 +156,51 @@ export const LudoRules = {
 
       for (let tIdx = 0; tIdx < oppTokens.length; tIdx++) {
         const oppProg = oppTokens[tIdx];
-        if (oppProg >= 0 && oppProg <= 50) {
-          const oppTrackIdx = this.getTrackIndex(oppColor, oppProg);
-          if (oppTrackIdx === targetTrackIdx) {
-            return { color: oppColor, tokenIndex: tIdx };
-          }
+        if (oppProg >= 0 && oppProg <= 50 && this.getTrackIndex(oppColor, oppProg) === targetTrackIdx) {
+          hits.push({ color: oppColor, tokenIndex: tIdx });
         }
       }
     }
 
-    return null;
+    return hits;
+  },
+
+  // first captured pawn, or null (the bots only need to know if something is hit)
+  checkCapture(gameState, movingColor, targetProgress) {
+    return this.checkCaptures(gameState, movingColor, targetProgress)[0] || null;
+  },
+
+  isCellBlockaded(gameState, color, progress) {
+    if (progress < 0 || progress > 50) return false;
+    const trackIdx = this.getTrackIndex(color, progress);
+    const tokens = gameState.tokens[color];
+    let count = 0;
+    for (const p of tokens) {
+      if (p >= 0 && p <= 50 && this.getTrackIndex(color, p) === trackIdx) {
+        count++;
+        if (count >= 2) return true;
+      }
+    }
+    return false;
+  },
+
+  isPathBlocked(gameState, movingColor, fromProgress, toProgress) {
+    for (let step = fromProgress + 1; step <= toProgress; step++) {
+      if (step > 50) break;
+      const stepTrackIdx = this.getTrackIndex(movingColor, step);
+      for (const oppColor of LUDO_COLORS) {
+        if (oppColor === movingColor) continue;
+        let count = 0;
+        const oppTokens = gameState.tokens[oppColor] || [];
+        for (const p of oppTokens) {
+          if (p >= 0 && p <= 50 && this.getTrackIndex(oppColor, p) === stepTrackIdx) {
+            count++;
+            if (count >= 2) return true;
+          }
+        }
+      }
+    }
+    return false;
   },
 
   applyMove(gameState, color, tokenIndex, roll) {
@@ -168,14 +216,15 @@ export const LudoRules = {
     };
 
     const curP = nextState.tokens[color][tokenIndex];
-    const nextP = (curP === -1) ? 0 : curP + roll;
+    let nextP = (curP === -1) ? 0 : curP + roll;
     nextState.tokens[color][tokenIndex] = nextP;
 
     let captured = null;
     if (nextP >= 0 && nextP <= 50) {
-      captured = this.checkCapture(gameState, color, nextP);
-      if (captured) {
-        nextState.tokens[captured.color][captured.tokenIndex] = -1;
+      const hits = this.checkCaptures(gameState, color, nextP);
+      captured = hits[0] || null;
+      for (const hit of hits) {
+        nextState.tokens[hit.color][hit.tokenIndex] = -1;
       }
     }
 
@@ -191,5 +240,29 @@ export const LudoRules = {
 
   isColorFinished(tokensOfColor) {
     return tokensOfColor.every(p => p === 56);
+  },
+
+  // Used before loading a saved game, so a broken save can never crash the board.
+  isValidSnapshot(snap) {
+    if (!snap || snap.version !== 1) return false;
+    if (!Array.isArray(snap.players) || snap.players.length < 2 || snap.players.length > 4) return false;
+
+    const seats = new Set();
+    for (const p of snap.players) {
+      if (!LUDO_COLORS.includes(p.color) || seats.has(p.color) || typeof p.isBot !== 'boolean') return false;
+      seats.add(p.color);
+    }
+    if (!seats.has(snap.activeColor)) return false;
+
+    for (const color of LUDO_COLORS) {
+      const pawns = snap.tokens && snap.tokens[color];
+      const ok = Array.isArray(pawns) && pawns.length === 4 &&
+        pawns.every(n => Number.isInteger(n) && n >= -1 && n <= 56);
+      if (!ok) return false;
+    }
+
+    if (!Array.isArray(snap.finishRank) || !snap.finishRank.every(c => seats.has(c))) return false;
+    if (!Number.isInteger(snap.diceValue) || snap.diceValue < 1 || snap.diceValue > 6) return false;
+    return snap.phase === 'WAIT_ROLL' || snap.phase === 'WAIT_PICK';
   }
 };

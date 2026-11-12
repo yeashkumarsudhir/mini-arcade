@@ -1,7 +1,11 @@
+// snake.js: Snake on a 20 by 20 grid. Turns are buffered so quick taps are not lost.
+import { Pen } from '../core/theme.js';
+import { Stats } from '../stats.js';
+
 export default {
   id: 'snake',
   title: 'Snake',
-  accent: '#2ea043',
+  accent: '#3fa66a',
 
   ctx: null,
   container: null,
@@ -18,7 +22,7 @@ export default {
   inputBuffer: [],
   score: 0,
   bestScore: 0,
-  mode: 'wrap',
+  mode: 'wrap', // 'wrap' | 'wall'
   isAlive: false,
 
   stepInterval: 140,
@@ -37,36 +41,30 @@ export default {
         </div>
 
         <div class="arena-side-controls">
-          <div class="telemetry-cell" style="text-align:center; padding:12px;">
-            <span class="t-label">Score</span>
-            <div id="snakeScoreDisplay" class="t-val" style="font-size:2rem; color:var(--status-win); margin:2px 0;">
-              0
-            </div>
-            <div id="snakeBestDisplay" style="font-size:0.75rem; color:var(--text-dim);">
-              Best: 0 pts
+          <div class="stat-box" style="text-align:center; padding:14px;">
+            <span class="stat-label">Score</span>
+            <div id="snakeScoreDisplay" class="stat-value" style="font-size:2.4rem;">0</div>
+            <div id="snakeBestDisplay" class="stat-label">Best: 0</div>
+          </div>
+
+          <div class="stat-box" style="gap:8px;">
+            <span class="stat-label">Edges of the board</span>
+            <div style="display:flex; gap:8px;">
+              <button type="button" class="btn-nav-pill is-on" id="btnSnakeWrap" style="flex:1;">Wrap around</button>
+              <button type="button" class="btn-nav-pill" id="btnSnakeWall" style="flex:1;">Walls</button>
             </div>
           </div>
 
-          <div class="telemetry-cell" style="gap:6px;">
-            <span class="t-label">Walls</span>
-            <div style="display:flex; gap:6px;">
-              <button type="button" class="btn-nav-pill" id="btnSnakeWrap" style="flex:1; justify-content:center; border-color:var(--brand-accent);">Wrap</button>
-              <button type="button" class="btn-nav-pill" id="btnSnakeWall" style="flex:1; justify-content:center;">Border</button>
-            </div>
-          </div>
-
-          <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; max-width:180px; margin:6px auto 0;" id="snakeTouchControls">
+          <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; max-width:200px; margin:8px auto 0;" id="snakeTouchControls">
             <div></div>
-            <button type="button" class="btn-nav-pill" id="btnSnakeUp" style="height:40px; justify-content:center; font-size:1rem;" aria-label="Up">▲</button>
+            <button type="button" class="btn-nav-pill" id="btnSnakeUp" style="height:44px; justify-content:center; font-size:1.1rem;" aria-label="Up">▲</button>
             <div></div>
-            <button type="button" class="btn-nav-pill" id="btnSnakeLeft" style="height:40px; justify-content:center; font-size:1rem;" aria-label="Left">◀</button>
-            <button type="button" class="btn-nav-pill" id="btnSnakeDown" style="height:40px; justify-content:center; font-size:1rem;" aria-label="Down">▼</button>
-            <button type="button" class="btn-nav-pill" id="btnSnakeRight" style="height:40px; justify-content:center; font-size:1rem;" aria-label="Right">▶</button>
+            <button type="button" class="btn-nav-pill" id="btnSnakeLeft" style="height:44px; justify-content:center; font-size:1.1rem;" aria-label="Left">◀</button>
+            <button type="button" class="btn-nav-pill" id="btnSnakeDown" style="height:44px; justify-content:center; font-size:1.1rem;" aria-label="Down">▼</button>
+            <button type="button" class="btn-nav-pill" id="btnSnakeRight" style="height:44px; justify-content:center; font-size:1.1rem;" aria-label="Right">▶</button>
           </div>
 
-          <div style="text-align:center; font-size:0.75rem; color:var(--text-dim); margin-top:2px;">
-            Swipe or use arrow keys / WASD
-          </div>
+          <div class="stat-label" style="text-align:center;">Arrow keys or WASD to steer</div>
         </div>
       </div>
     `;
@@ -110,27 +108,12 @@ export default {
     const btnWrap = document.getElementById('btnSnakeWrap');
     const btnWall = document.getElementById('btnSnakeWall');
     if (btnWrap && btnWall) {
-      btnWrap.style.borderColor = selectedMode === 'wrap' ? 'var(--brand-accent)' : 'var(--border-line)';
-      btnWall.style.borderColor = selectedMode === 'wall' ? 'var(--brand-accent)' : 'var(--border-line)';
+      btnWrap.classList.toggle('is-on', selectedMode === 'wrap');
+      btnWall.classList.toggle('is-on', selectedMode === 'wall');
     }
 
-    const scores = this.getHighScores();
-    this.bestScore = selectedMode === 'wall' ? scores.wall : scores.wrap;
+    this.bestScore = Stats.get('snake').byMode[selectedMode] || 0;
     this.updateScoreDisplay();
-  },
-
-  getHighScores() {
-    try {
-      const raw = localStorage.getItem('parlour_arcade_player_stats_v1');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        return {
-          wrap: parsed.stats?.snake?.highScoreWrap || parsed.stats?.snake?.highScore || 0,
-          wall: parsed.stats?.snake?.highScoreWall || 0
-        };
-      }
-    } catch {}
-    return { wrap: 0, wall: 0 };
   },
 
   setupListeners() {
@@ -184,7 +167,7 @@ export default {
     }
 
     this.stepTimer += dt * 1000;
-    while (this.stepTimer >= this.stepInterval) {
+    while (this.isAlive && this.stepTimer >= this.stepInterval) {
       this.stepTimer -= this.stepInterval;
       this.simulationTick();
     }
@@ -262,14 +245,12 @@ export default {
 
   handleCrash() {
     this.isAlive = false;
-    this.ctx.fx.sfx.defeat();
     this.loop.stop();
 
     this.ctx.recordResult('LOSS', {
       mode: this.mode,
       score: this.score,
-      summary: `Score: ${this.score} pts (${this.mode === 'wall' ? 'Border' : 'Wrap'})`,
-      ranked: true
+      summary: `You scored ${this.score} (${this.mode === 'wall' ? 'walls' : 'wrap around'}).`
     });
   },
 
@@ -277,7 +258,7 @@ export default {
     const scoreEl = document.getElementById('snakeScoreDisplay');
     const bestEl = document.getElementById('snakeBestDisplay');
     if (scoreEl) scoreEl.textContent = this.score;
-    if (bestEl) bestEl.textContent = `Best: ${this.bestScore} pts`;
+    if (bestEl) bestEl.textContent = `Best: ${this.bestScore}`;
   },
 
   render(alpha) {
@@ -287,10 +268,13 @@ export default {
     const h = this.canvas.height;
     const cell = w / this.cols;
 
-    ctx.fillStyle = '#0e1117';
+    const P = Pen.get();
+
+    ctx.fillStyle = P.paper;
     ctx.fillRect(0, 0, w, h);
 
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+    // faint grid lines
+    ctx.strokeStyle = P.grid;
     ctx.lineWidth = 1;
     for (let c = 0; c <= this.cols; c++) {
       ctx.beginPath();
@@ -305,35 +289,44 @@ export default {
       ctx.stroke();
     }
 
+    // red border in walls mode
     if (this.mode === 'wall') {
-      ctx.strokeStyle = '#f85149';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(1, 1, w - 2, h - 2);
+      ctx.strokeStyle = P.red;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(1.5, 1.5, w - 3, h - 3);
     }
 
     const fx = this.food.x * cell + cell / 2;
     const fy = this.food.y * cell + cell / 2;
-    const fradius = cell * 0.36;
+    const fradius = cell * 0.38;
 
     if (this.food.isGolden) {
+      // gold food shrinks a ring as its time runs out
       const pct = Math.max(0, this.food.timer / this.food.maxTimer);
       ctx.beginPath();
-      ctx.arc(fx, fy, fradius + 3 * pct, 0, Math.PI * 2);
-      ctx.strokeStyle = '#d29922';
+      ctx.arc(fx, fy, fradius + 4 * pct, 0, Math.PI * 2);
+      ctx.strokeStyle = P.yellow;
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
       ctx.beginPath();
       ctx.arc(fx, fy, fradius, 0, Math.PI * 2);
-      ctx.fillStyle = '#d29922';
+      ctx.fillStyle = P.yellow;
       ctx.fill();
+      ctx.strokeStyle = P.ink;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
     } else {
       ctx.beginPath();
       ctx.arc(fx, fy, fradius, 0, Math.PI * 2);
-      ctx.fillStyle = '#f85149';
+      ctx.fillStyle = P.red;
       ctx.fill();
+      ctx.strokeStyle = P.ink;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
     }
 
+    // snake, drawn tail first so the head ends up on top
     for (let i = this.snake.length - 1; i >= 0; i--) {
       const cur = this.snake[i];
       const prev = this.prevSnake[i] || cur;
@@ -346,33 +339,47 @@ export default {
 
       const px = ix * cell + cell / 2;
       const py = iy * cell + cell / 2;
-      const radius = cell * 0.42;
+      const radius = cell * 0.44;
 
       if (i === 0) {
+        // head
         ctx.beginPath();
         ctx.arc(px, py, radius, 0, Math.PI * 2);
-        ctx.fillStyle = '#2ea043';
+        ctx.fillStyle = P.green;
         ctx.fill();
+        ctx.strokeStyle = P.ink;
+        ctx.lineWidth = 2;
+        ctx.stroke();
 
-        const eyeOffsetX = this.direction.y * 3;
-        const eyeOffsetY = this.direction.x * 3;
-        const forwardX = this.direction.x * 3;
-        const forwardY = this.direction.y * 3;
+        // eyes
+        const eyeOffsetX = this.direction.y * 3.5;
+        const eyeOffsetY = this.direction.x * 3.5;
+        const forwardX = this.direction.x * 3.5;
+        const forwardY = this.direction.y * 3.5;
 
         [1, -1].forEach(side => {
           const ex = px + forwardX + eyeOffsetX * side;
           const ey = py + forwardY + eyeOffsetY * side;
 
           ctx.beginPath();
-          ctx.arc(ex, ey, 2, 0, Math.PI * 2);
-          ctx.fillStyle = '#000000';
+          ctx.arc(ex, ey, 2.5, 0, Math.PI * 2);
+          ctx.fillStyle = P.ink;
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.arc(ex + this.direction.x, ey + this.direction.y, 1, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffffff';
           ctx.fill();
         });
       } else {
+        // body
         ctx.beginPath();
-        ctx.arc(px, py, radius * 0.85, 0, Math.PI * 2);
-        ctx.fillStyle = '#238636';
+        ctx.arc(px, py, radius * 0.88, 0, Math.PI * 2);
+        ctx.fillStyle = P.greenDark;
         ctx.fill();
+        ctx.strokeStyle = P.ink;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
       }
     }
   },

@@ -1,7 +1,10 @@
+// breakout.js: Brick Breaker. Paddle and ball move by time (px per second), not by frame.
+import { Pen } from '../core/theme.js';
+
 export default {
   id: 'breakout',
   title: 'Brick Breaker',
-  accent: '#2f81f7',
+  accent: '#f2b705',
 
   ctx: null,
   container: null,
@@ -51,22 +54,18 @@ export default {
     this.container.innerHTML = `
       <div class="arena-dual-layout">
         <div class="arena-board-frame">
-          <canvas id="breakoutCanvas" width="440" height="520" style="display:block; max-width:100%; height:auto; background:#0e1117; border-radius:6px; cursor:none;"></canvas>
+          <canvas id="breakoutCanvas" width="440" height="520" style="cursor:none;"></canvas>
         </div>
 
         <div class="arena-side-controls">
-          <div class="telemetry-cell" style="text-align:center; padding:12px;">
-            <span class="t-label">Score</span>
-            <div id="breakoutScore" class="t-val" style="font-size:2rem; color:var(--brand-accent); margin:2px 0;">0</div>
-            <div id="breakoutLives" style="font-size:0.8rem; color:var(--text-sub);">
-              Lives: 3
-            </div>
+          <div class="stat-box" style="text-align:center; padding:14px;">
+            <span class="stat-label">Score</span>
+            <div id="breakoutScore" class="stat-value" style="font-size:2.4rem;">0</div>
+            <div id="breakoutLives" class="stat-label">Lives: 3</div>
           </div>
 
-          <div class="telemetry-cell" style="text-align:center; padding:10px;">
-            <p style="font-size:0.75rem; color:var(--text-sub); line-height:1.4;">
-              Slide mouse or touch to steer paddle. Tap or press Space to launch ball.
-            </p>
+          <div class="stat-label" style="text-align:center;">
+            Slide your finger or mouse to move the paddle. Tap or press Space to launch the ball.
           </div>
         </div>
       </div>
@@ -105,7 +104,7 @@ export default {
 
   initBricks() {
     this.bricks = [];
-    const colors = ['#f85149', '#d29922', '#2ea043', '#2f81f7', '#8250df'];
+    const colors = ['#d8504e', '#e8893c', '#f2b705', '#3fa66a', '#3d63e0'];
 
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
@@ -131,6 +130,7 @@ export default {
       this.paddle.x = Math.max(0, Math.min(this.width - this.paddle.w, mouseX - this.paddle.w / 2));
     };
 
+    // pointer events cover mouse, touch and pen
     this.canvas.addEventListener('pointermove', (e) => onMove(e.clientX));
     this.canvas.addEventListener('pointerdown', (e) => onMove(e.clientX));
 
@@ -174,6 +174,7 @@ export default {
     this.ball.x += this.ball.vx * this.ball.speedMultiplier * dt;
     this.ball.y += this.ball.vy * this.ball.speedMultiplier * dt;
 
+    // side walls
     if (this.ball.x - this.ball.radius <= 0) {
       this.ball.x = this.ball.radius;
       this.ball.vx *= -1;
@@ -184,12 +185,14 @@ export default {
       this.ctx.fx.playTone(400, 'triangle', 0.02, 0.08);
     }
 
+    // ceiling
     if (this.ball.y - this.ball.radius <= 0) {
       this.ball.y = this.ball.radius;
       this.ball.vy *= -1;
       this.ctx.fx.playTone(480, 'triangle', 0.02, 0.08);
     }
 
+    // paddle
     if (
       this.ball.y + this.ball.radius >= this.paddle.y &&
       this.ball.y - this.ball.radius <= this.paddle.y + this.paddle.h &&
@@ -198,11 +201,13 @@ export default {
       this.ball.vy > 0
     ) {
       this.ball.vy = -Math.abs(this.ball.vy);
+      // where it hits the paddle decides the angle
       const hitPoint = (this.ball.x - (this.paddle.x + this.paddle.w / 2)) / (this.paddle.w / 2);
       this.ball.vx = hitPoint * 240;
       this.ctx.fx.sfx.tokenHop();
     }
 
+    // bricks
     let activeBricks = 0;
     for (const b of this.bricks) {
       if (!b.alive) continue;
@@ -218,7 +223,7 @@ export default {
         this.ball.vy *= -1;
         this.score += b.points;
         this.ball.speedMultiplier = Math.min(1.4, this.ball.speedMultiplier + 0.015);
-        this.ctx.fx.playTone(600 + b.points * 8, 'triangle', 0.03, 0.1);
+        this.ctx.fx.playTone(600 + b.points * 8, 'triangle', 0.03, 0.12);
         this.updateUI();
         break;
       }
@@ -229,10 +234,11 @@ export default {
       return;
     }
 
+    // missed the ball
     if (this.ball.y - this.ball.radius > this.height) {
       this.lives--;
       this.updateUI();
-      this.ctx.fx.sfx.defeat();
+      this.ctx.fx.playTone(200, 'triangle', 0.15, 0.14);
 
       if (this.lives <= 0) {
         this.handleGameEnd('LOSS');
@@ -246,13 +252,11 @@ export default {
     this.isPlaying = false;
     this.loop.stop();
 
-    if (outcome === 'WIN') {
-      this.ctx.fx.sfx.victory();
-    }
-
     this.ctx.recordResult(outcome, {
       score: this.score,
-      summary: `Score: ${this.score} pts (${outcome === 'WIN' ? 'Board Cleared' : 'Game Over'})`
+      summary: outcome === 'WIN'
+        ? `You cleared every brick and scored ${this.score}.`
+        : `You scored ${this.score}.`
     });
   },
 
@@ -260,37 +264,48 @@ export default {
     const sEl = document.getElementById('breakoutScore');
     const lEl = document.getElementById('breakoutLives');
     if (sEl) sEl.textContent = this.score;
-    if (lEl) lEl.textContent = `Lives: ${this.lives}`;
+    if (lEl) lEl.textContent = `Lives: ${Math.max(0, this.lives)}`;
   },
 
   render() {
     if (!this.canvasCtx) return;
     const ctx = this.canvasCtx;
 
-    ctx.fillStyle = '#0e1117';
+    const P = Pen.get();
+
+    ctx.fillStyle = P.paper;
     ctx.fillRect(0, 0, this.width, this.height);
 
     for (const b of this.bricks) {
       if (!b.alive) continue;
+
       ctx.fillStyle = b.color;
       ctx.fillRect(b.x, b.y, this.brickW, this.brickH);
+
+      ctx.strokeStyle = P.ink;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(b.x, b.y, this.brickW, this.brickH);
     }
 
-    // Paddle
-    ctx.fillStyle = 'var(--brand-accent)';
+    ctx.fillStyle = P.blue;
     ctx.fillRect(this.paddle.x, this.paddle.y, this.paddle.w, this.paddle.h);
+    ctx.strokeStyle = P.ink;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(this.paddle.x, this.paddle.y, this.paddle.w, this.paddle.h);
 
-    // Ball
     ctx.beginPath();
     ctx.arc(this.ball.x, this.ball.y, this.ball.radius, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = P.paper;
     ctx.fill();
+    ctx.strokeStyle = P.ink;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
 
     if (!this.ball.isLaunched && this.isPlaying) {
-      ctx.font = '600 12px Inter, sans-serif';
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.font = '600 13px Mukta, sans-serif';
+      ctx.fillStyle = P.dim;
       ctx.textAlign = 'center';
-      ctx.fillText('Tap or press Space to launch', this.width / 2, this.paddle.y - 18);
+      ctx.fillText('Tap or press Space to launch', this.width / 2, this.paddle.y - 20);
     }
   },
 

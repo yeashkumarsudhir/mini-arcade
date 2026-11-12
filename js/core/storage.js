@@ -1,3 +1,4 @@
+// storage.js: localStorage wrapper that keeps working (in memory) if the browser blocks storage.
 export class SafeStorage {
   constructor() {
     this.memory = new Map();
@@ -6,7 +7,7 @@ export class SafeStorage {
 
   check() {
     try {
-      const test = '__mini_arcade_probe__';
+      const test = '__cae_storage_probe__';
       localStorage.setItem(test, test);
       localStorage.removeItem(test);
       return true;

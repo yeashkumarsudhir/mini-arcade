@@ -1,7 +1,11 @@
+// flappy.js: flap through the gaps. Gravity and speed are in pixels per second, so it plays the same on any screen.
+import { Pen } from '../core/theme.js';
+import { Stats } from '../stats.js';
+
 export default {
   id: 'flappy',
-  title: 'Flappy Bird',
-  accent: '#d29922',
+  title: 'Flappy',
+  accent: '#f2b705',
 
   ctx: null,
   container: null,
@@ -33,34 +37,26 @@ export default {
     this.container.innerHTML = `
       <div class="arena-dual-layout">
         <div class="arena-board-frame">
-          <canvas id="flappyCanvas" width="400" height="520" style="display:block; max-width:100%; height:auto; border-radius:6px; background:#0e1117; cursor:pointer;"></canvas>
+          <canvas id="flappyCanvas" width="400" height="520" style="cursor:pointer;"></canvas>
         </div>
 
         <div class="arena-side-controls">
-          <div class="telemetry-cell" style="text-align:center; padding:12px;">
-            <span class="t-label">Gates</span>
-            <div id="flappyScoreDisplay" class="t-val" style="font-size:2rem; color:var(--status-coin); margin:2px 0;">
-              0
-            </div>
-            <div id="flappyBestDisplay" style="font-size:0.75rem; color:var(--text-dim);">
-              Best: 0 gates
-            </div>
+          <div class="stat-box" style="text-align:center; padding:14px;">
+            <span class="stat-label">Gates passed</span>
+            <div id="flappyScoreDisplay" class="stat-value" style="font-size:2.4rem;">0</div>
+            <div id="flappyBestDisplay" class="stat-label">Best: 0</div>
           </div>
 
-          <div class="telemetry-cell" style="gap:6px;">
-            <span class="t-label">Speed</span>
+          <div class="stat-box" style="gap:8px;">
+            <span class="stat-label">Speed</span>
             <div style="display:flex; gap:6px;">
-              <button type="button" class="btn-nav-pill" id="btnFlappyChill" style="flex:1; justify-content:center; font-size:0.75rem;">Chill</button>
-              <button type="button" class="btn-nav-pill" id="btnFlappyNormal" style="flex:1; justify-content:center; font-size:0.75rem; border-color:var(--brand-accent);">Normal</button>
-              <button type="button" class="btn-nav-pill" id="btnFlappyHard" style="flex:1; justify-content:center; font-size:0.75rem;">Fast</button>
+              <button type="button" class="btn-nav-pill" id="btnFlappyChill" style="flex:1;">Chill</button>
+              <button type="button" class="btn-nav-pill is-on" id="btnFlappyNormal" style="flex:1;">Normal</button>
+              <button type="button" class="btn-nav-pill" id="btnFlappyHard" style="flex:1;">Hard</button>
             </div>
           </div>
 
-          <div class="telemetry-cell" style="text-align:center; padding:10px;">
-            <span style="font-size:0.75rem; color:var(--text-sub);">
-              Tap canvas or press Space to jump
-            </span>
-          </div>
+          <div class="stat-label" style="text-align:center;">Tap the board or press Space to flap</div>
         </div>
       </div>
     `;
@@ -98,24 +94,14 @@ export default {
 
   setPaceUI(key) {
     this.presetKey = key;
-    ['btnFlappyChill', 'btnFlappyNormal', 'btnFlappyHard'].forEach(id => {
-      const btn = document.getElementById(id);
-      if (btn) btn.style.borderColor = 'var(--border-line)';
-    });
-
-    if (key === 'CHILL') document.getElementById('btnFlappyChill')?.style.setProperty('border-color', 'var(--brand-accent)');
-    else if (key === 'NORMAL') document.getElementById('btnFlappyNormal')?.style.setProperty('border-color', 'var(--brand-accent)');
-    else if (key === 'HARD') document.getElementById('btnFlappyHard')?.style.setProperty('border-color', 'var(--brand-accent)');
+    const buttons = { CHILL: 'btnFlappyChill', NORMAL: 'btnFlappyNormal', HARD: 'btnFlappyHard' };
+    for (const [name, id] of Object.entries(buttons)) {
+      document.getElementById(id)?.classList.toggle('is-on', name === key);
+    }
   },
 
   loadHighScore() {
-    try {
-      const raw = localStorage.getItem('parlour_arcade_player_stats_v1');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        this.bestScore = parsed.stats?.flappy?.highScore || 0;
-      }
-    } catch {}
+    this.bestScore = Stats.get('flappy').best;
   },
 
   setupListeners() {
@@ -166,14 +152,14 @@ export default {
 
     if (!this.isFlying) {
       this.hoverTime += dt * 4;
-      this.droneY = 240 + Math.sin(this.hoverTime) * 10;
+      this.droneY = 240 + Math.sin(this.hoverTime) * 12;
       return;
     }
 
     this.velocity += cfg.g * dt;
     this.droneY += this.velocity * dt;
 
-    if (this.droneY >= this.canvas.height - 18 || this.droneY <= 12) {
+    if (this.droneY >= this.canvas.height - 20 || this.droneY <= 15) {
       this.handleCrash();
       return;
     }
@@ -187,7 +173,7 @@ export default {
     const droneBox = {
       x: 75,
       y: this.droneY,
-      radius: 11
+      radius: 12
     };
 
     for (let i = this.laserPipes.length - 1; i >= 0; i--) {
@@ -197,7 +183,7 @@ export default {
       if (!pipe.passed && pipe.x < droneBox.x) {
         pipe.passed = true;
         this.score++;
-        this.ctx.fx.playTone(880, 'sine', 0.04, 0.1);
+        this.ctx.fx.playTone(880, 'sine', 0.04, 0.12);
         if (this.score > this.bestScore) this.bestScore = this.score;
         this.updateScoreDisplay();
       }
@@ -232,11 +218,10 @@ export default {
   handleCrash() {
     this.isCrashed = true;
     this.retryLockTimer = 0.4;
-    this.ctx.fx.sfx.defeat();
 
     this.ctx.recordResult('LOSS', {
       score: this.score,
-      summary: `Cleared ${this.score} gates (${this.presetKey.toLowerCase()})`
+      summary: `You got through ${this.score} ${this.score === 1 ? 'gap' : 'gaps'} (${this.presetKey.toLowerCase()}).`
     });
   },
 
@@ -244,7 +229,7 @@ export default {
     const scoreEl = document.getElementById('flappyScoreDisplay');
     const bestEl = document.getElementById('flappyBestDisplay');
     if (scoreEl) scoreEl.textContent = this.score;
-    if (bestEl) bestEl.textContent = `Best: ${this.bestScore} gates`;
+    if (bestEl) bestEl.textContent = `Best: ${this.bestScore}`;
   },
 
   render(alpha) {
@@ -253,26 +238,47 @@ export default {
     const w = this.canvas.width;
     const h = this.canvas.height;
 
-    ctx.fillStyle = '#0e1117';
+    const P = Pen.get();
+
+    ctx.fillStyle = P.paper;
     ctx.fillRect(0, 0, w, h);
 
-    // Pipes
+    // faint vertical lines that scroll past
+    ctx.strokeStyle = P.grid;
+    ctx.lineWidth = 1;
+    const time = performance.now() / 1000;
+    const offset = (time * 30) % 36;
+
+    for (let x = -offset; x < w; x += 36) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+    }
+
+    // pipes
     this.laserPipes.forEach(p => {
-      // Top Pipe
-      ctx.fillStyle = '#161b22';
+      ctx.fillStyle = P.pipe;
       ctx.fillRect(p.x, 0, p.width, p.topH);
-      ctx.strokeStyle = '#30363d';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = P.ink;
+      ctx.lineWidth = 2;
       ctx.strokeRect(p.x, 0, p.width, p.topH);
 
-      // Bottom Pipe
+      ctx.fillStyle = P.pipeLip;
+      ctx.fillRect(p.x - 3, p.topH - 12, p.width + 6, 12);
+      ctx.strokeRect(p.x - 3, p.topH - 12, p.width + 6, 12);
+
       const bottomY = p.topH + p.gateH;
-      ctx.fillStyle = '#161b22';
+      ctx.fillStyle = P.pipe;
       ctx.fillRect(p.x, bottomY, p.width, h - bottomY);
       ctx.strokeRect(p.x, bottomY, p.width, h - bottomY);
+
+      ctx.fillStyle = P.pipeLip;
+      ctx.fillRect(p.x - 3, bottomY, p.width + 6, 12);
+      ctx.strokeRect(p.x - 3, bottomY, p.width + 6, 12);
     });
 
-    // Bird
+    // the bird
     const droneX = 75;
     const droneY = this.droneY;
     const tilt = this.isFlying ? Math.min(Math.PI / 4, Math.max(-Math.PI / 4, this.velocity * 0.002)) : 0;
@@ -282,60 +288,98 @@ export default {
     ctx.rotate(tilt);
 
     ctx.beginPath();
-    ctx.ellipse(0, 0, 13, 10, 0, 0, Math.PI * 2);
-    ctx.fillStyle = '#d29922';
+    ctx.ellipse(0, 0, 14, 11, 0, 0, Math.PI * 2);
+    ctx.fillStyle = P.yellow;
     ctx.fill();
+    ctx.strokeStyle = P.ink;
+    ctx.lineWidth = 2;
+    ctx.stroke();
 
     ctx.beginPath();
-    ctx.arc(5, -3, 2.5, 0, Math.PI * 2);
+    ctx.arc(6, -3, 3, 0, Math.PI * 2);
     ctx.fillStyle = '#ffffff';
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(6, -3, 1.2, 0, Math.PI * 2);
-    ctx.fillStyle = '#000000';
+    ctx.arc(7, -3, 1.5, 0, Math.PI * 2);
+    ctx.fillStyle = P.ink;
     ctx.fill();
 
     ctx.beginPath();
-    ctx.moveTo(11, 0);
-    ctx.lineTo(17, 2);
-    ctx.lineTo(11, 4);
+    ctx.moveTo(12, 0);
+    ctx.lineTo(19, 2);
+    ctx.lineTo(12, 5);
     ctx.closePath();
-    ctx.fillStyle = '#f85149';
+    ctx.fillStyle = P.red;
     ctx.fill();
+    ctx.strokeStyle = P.ink;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // wing
+    const wingY = Math.sin(time * 20) * 4;
+    ctx.beginPath();
+    ctx.ellipse(-4, wingY, 6, 4, 0, 0, Math.PI * 2);
+    ctx.fillStyle = P.orange;
+    ctx.fill();
+    ctx.strokeStyle = P.ink;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
 
     ctx.restore();
 
-    // Plain game over plaque
+    // small result card on the canvas after a crash
     if (this.isCrashed) {
-      const boxW = 240;
-      const boxH = 140;
+      const boxW = 260;
+      const boxH = 170;
       const boxX = (w - boxW) / 2;
-      const boxY = 170;
+      const boxY = 150;
 
-      ctx.fillStyle = '#161b22';
+      ctx.fillStyle = P.paper;
       ctx.fillRect(boxX, boxY, boxW, boxH);
-      ctx.strokeStyle = 'var(--border-line)';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = P.ink;
+      ctx.lineWidth = 2;
       ctx.strokeRect(boxX, boxY, boxW, boxH);
 
-      ctx.font = '700 16px Inter, sans-serif';
-      ctx.fillStyle = '#f85149';
       ctx.textAlign = 'center';
-      ctx.fillText('Game Over', w / 2, boxY + 36);
+      ctx.font = '700 22px Kalam, sans-serif';
+      ctx.fillStyle = P.red;
+      ctx.fillText('Crashed', w / 2, boxY + 36);
 
-      ctx.font = '600 12px Inter, sans-serif';
-      ctx.fillStyle = 'var(--text-sub)';
-      ctx.fillText(`Gates cleared: ${this.score}`, w / 2, boxY + 68);
+      ctx.font = '600 13px Mukta, sans-serif';
+      ctx.fillStyle = P.dim;
+      ctx.fillText('Gaps passed', w / 2, boxY + 64);
 
-      ctx.font = '500 11px Inter, sans-serif';
-      ctx.fillStyle = 'var(--text-dim)';
-      ctx.fillText(this.retryLockTimer > 0 ? 'Wait...' : 'Tap or press Space to retry', w / 2, boxY + 105);
+      ctx.font = '700 40px Kalam, sans-serif';
+      ctx.fillStyle = P.text;
+      ctx.fillText(this.score, w / 2, boxY + 106);
+
+      let comment = 'Keep going';
+      if (this.score >= 15) comment = 'Great run';
+      else if (this.score >= 8) comment = 'Nice one';
+      else if (this.score >= 3) comment = 'Not bad';
+
+      ctx.font = '600 13px Mukta, sans-serif';
+      ctx.fillStyle = P.blue;
+      ctx.fillText(comment, w / 2, boxY + 130);
+
+      ctx.font = '400 12px Mukta, sans-serif';
+      ctx.fillStyle = P.dim;
+      ctx.fillText(this.retryLockTimer > 0 ? 'Wait a moment...' : 'Tap the board or press Space to retry', w / 2, boxY + 154);
     }
   },
 
-  pause() { if (this.loop) this.loop.pause(); },
-  resume() { if (this.loop) this.loop.resume(); },
-  restart() { this.start({ preset: this.presetKey }); },
+  pause() {
+    if (this.loop) this.loop.pause();
+  },
+
+  resume() {
+    if (this.loop) this.loop.resume();
+  },
+
+  restart() {
+    this.start({ preset: this.presetKey });
+  },
+
   destroy() {
     if (this.loop) this.loop.stop();
     this.container = null;

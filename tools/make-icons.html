@@ -2,104 +2,42 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Icon Generator — Mini Arcade</title>
+  <title>Make the app icons</title>
   <style>
-    body {
-      background: #0e1117;
-      color: #e6edf3;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      padding: 32px;
-      text-align: center;
-    }
-    canvas {
-      border: 1px solid #30363d;
-      margin: 16px;
-      border-radius: 12px;
-    }
-    button {
-      padding: 10px 20px;
-      background: #2f81f7;
-      color: #ffffff;
-      font-weight: 600;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-    }
+    body { font-family: system-ui, sans-serif; padding: 24px; }
+    canvas { border: 1px solid #ccc; margin: 8px 8px 8px 0; }
+    a { display: block; margin-bottom: 16px; }
   </style>
 </head>
 <body>
-  <h1>App Icon Generator</h1>
-  <p>Generates PNG icon assets (192px, 512px, and 512px maskable) directly on canvas.</p>
-  <button id="btnExport">Download Icons</button>
-  <br>
-  <canvas id="c192" width="192" height="192"></canvas>
-  <canvas id="c512" width="512" height="512"></canvas>
-  <canvas id="cMask" width="512" height="512"></canvas>
+  <h1>App icons</h1>
+  <p>Draws icons/icon.svg and icons/icon-maskable.svg as PNG. Right-click a link and save it into the icons folder with the name shown.</p>
+  <div id="out"></div>
 
   <script>
-    function drawIcon(canvas, isMaskable) {
-      const ctx = canvas.getContext('2d');
-      const s = canvas.width;
+    const jobs = [
+      { svg: '../icons/icon.svg', size: 192, name: 'icon-192.png' },
+      { svg: '../icons/icon.svg', size: 512, name: 'icon-512.png' },
+      { svg: '../icons/icon-maskable.svg', size: 512, name: 'maskable-512.png' }
+    ];
 
-      ctx.fillStyle = '#0e1117';
-      ctx.fillRect(0, 0, s, s);
+    for (const job of jobs) {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = job.size;
+        canvas.getContext('2d').drawImage(img, 0, 0, job.size, job.size);
 
-      const center = s / 2;
-      const radius = isMaskable ? s * 0.28 : s * 0.38;
+        const link = document.createElement('a');
+        link.href = canvas.toDataURL('image/png');
+        link.download = job.name;
+        link.textContent = `Download ${job.name}`;
 
-      ctx.save();
-      ctx.translate(center, center);
-
-      // Gamepad console outline
-      ctx.beginPath();
-      const padW = radius * 1.5;
-      const padH = radius * 0.9;
-      ctx.roundRect(-padW / 2, -padH / 2, padW, padH, padH * 0.25);
-      ctx.fillStyle = '#161b22';
-      ctx.fill();
-      ctx.strokeStyle = '#2f81f7';
-      ctx.lineWidth = s * 0.035;
-      ctx.stroke();
-
-      // D-Pad plus sign
-      const dSize = radius * 0.22;
-      ctx.fillStyle = '#e6edf3';
-      ctx.fillRect(-radius * 0.45 - dSize / 6, -dSize / 2, dSize / 3, dSize);
-      ctx.fillRect(-radius * 0.45 - dSize / 2, -dSize / 6, dSize, dSize / 3);
-
-      // Buttons
-      ctx.beginPath();
-      ctx.arc(radius * 0.45, -radius * 0.1, radius * 0.1, 0, Math.PI * 2);
-      ctx.fillStyle = '#f85149';
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.arc(radius * 0.3, radius * 0.12, radius * 0.1, 0, Math.PI * 2);
-      ctx.fillStyle = '#d29922';
-      ctx.fill();
-
-      ctx.restore();
-    }
-
-    const c192 = document.getElementById('c192');
-    const c512 = document.getElementById('c512');
-    const cMask = document.getElementById('cMask');
-
-    drawIcon(c192, false);
-    drawIcon(c512, false);
-    drawIcon(cMask, true);
-
-    document.getElementById('btnExport').addEventListener('click', () => {
-      const download = (cvs, name) => {
-        const a = document.createElement('a');
-        a.download = name;
-        a.href = cvs.toDataURL('image/png');
-        a.click();
+        const out = document.getElementById('out');
+        out.append(canvas, link);
       };
-      download(c192, 'icon-192.png');
-      setTimeout(() => download(c512, 'icon-512.png'), 200);
-      setTimeout(() => download(cMask, 'maskable-512.png'), 400);
-    });
+      img.src = job.svg;
+    }
   </script>
 </body>
 </html>

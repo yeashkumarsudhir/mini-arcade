@@ -1,7 +1,12 @@
+// mole.js: Whack-a-Mole. 3 by 3 holes, 30 seconds, score 120 to win.
+// All timers go through ctx.scheduler, so the pause menu stops them too.
+const moleFace = (fill) => `<svg viewBox="0 0 48 48" width="54" height="54" aria-hidden="true"><ellipse cx="24" cy="28" rx="17" ry="16" fill="${fill}" stroke="currentColor" stroke-width="2"/><circle cx="17" cy="24" r="2.4" fill="currentColor"/><circle cx="31" cy="24" r="2.4" fill="currentColor"/><ellipse cx="24" cy="31" rx="4.5" ry="3.2" fill="#d8504e" stroke="currentColor" stroke-width="1.4"/></svg>`;
+const HIT_BURST = '<svg viewBox="0 0 48 48" width="54" height="54" aria-hidden="true"><path d="M24 3l4.5 10.5L39 9l-4.5 10.5L45 24l-10.5 4.5L39 39l-10.5-4.5L24 45l-4.5-10.5L9 39l4.5-10.5L3 24l10.5-4.5L9 9l10.5 4.5z" fill="#f2b705" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
+
 export default {
   id: 'mole',
-  title: 'Whack a Mole',
-  accent: '#2ea043',
+  title: 'Whack-a-Mole',
+  accent: '#9a6b52',
 
   ctx: null,
   container: null,
@@ -19,35 +24,32 @@ export default {
 
     this.container.innerHTML = `
       <div class="arena-dual-layout">
-        <div class="arena-board-frame" style="padding:12px; background:var(--bg-panel); border:1px solid var(--border-line); border-radius:8px;">
-          <div id="moleHolesGrid" style="display:grid; grid-template-columns:repeat(3, 86px); grid-template-rows:repeat(3, 86px); gap:10px; background:var(--bg-base); padding:10px; border-radius:6px; border:1px solid var(--border-line);">
+        <div class="arena-board-frame" style="padding:12px;">
+          <div id="moleHolesGrid" style="display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; width:min(calc(100vw - 54px), 330px); background:var(--bg-base); padding:12px; border-radius:6px; border:1.5px solid var(--border-line);">
             ${Array(9).fill(0).map((_, i) => `
-              <div class="mole-hole" data-idx="${i}" style="position:relative; width:86px; height:86px; background:#161b22; border:1px solid var(--border-line); border-radius:50%; overflow:hidden; cursor:pointer;">
-                <div class="mole-actor" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:1.6rem; font-weight:700; transform:translateY(100%); transition:transform 0.12s ease-out; user-select:none;"></div>
+              <div class="mole-hole" data-idx="${i}">
+                <div class="mole-actor"></div>
               </div>
             `).join('')}
           </div>
         </div>
 
         <div class="arena-side-controls">
-          <div class="telemetry-cell" style="padding:12px;">
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; text-align:center;">
+          <div class="stat-box">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; text-align:center;">
               <div>
-                <span class="t-label">Score</span>
-                <div id="moleScore" class="t-val" style="font-size:1.8rem; color:var(--status-win); margin-top:2px;">0</div>
+                <span class="stat-label">Score</span>
+                <div id="moleScore" class="stat-value" style="font-size:2.2rem;">0</div>
               </div>
               <div>
-                <span class="t-label">Time Left</span>
-                <div id="moleTime" class="t-val" style="font-size:1.8rem; margin-top:2px;">30s</div>
+                <span class="stat-label">Time left</span>
+                <div id="moleTime" class="stat-value" style="font-size:2.2rem;">30s</div>
               </div>
             </div>
           </div>
 
-          <div class="telemetry-cell" style="padding:10px; text-align:center;">
-            <p style="font-size:0.75rem; color:var(--text-sub); line-height:1.4;">
-              Mole = 10 pts &bull; Golden Mole = 30 pts<br>
-              Tap as fast as they appear!
-            </p>
+          <div class="stat-label" style="text-align:center;">
+            Brown mole 10 points, golden mole 30. Get to 120 to win.
           </div>
         </div>
       </div>
@@ -66,13 +68,13 @@ export default {
     this.resetAllHolesVisual();
     this.updateUI();
 
-    this.clockTimer = setInterval(() => {
+    this.clockTimer = this.ctx.scheduler.every(1000, () => {
       this.timeLeft--;
       this.updateUI();
       if (this.timeLeft <= 0) {
         this.endMatch();
       }
-    }, 1000);
+    });
 
     this.startSpawning();
   },
@@ -88,21 +90,22 @@ export default {
 
       if (emptyIndices.length > 0) {
         const pickIdx = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
-        const isGolden = Math.random() < 0.2;
+        const isGolden = Math.random() < 0.22;
         const moleType = isGolden ? 'golden' : 'regular';
 
         this.showMole(pickIdx, moleType);
 
+        // moles stay for less time as the clock runs down
         const stayDuration = Math.max(500, 950 - (30 - this.timeLeft) * 15);
-        setTimeout(() => {
+        this.ctx.scheduler.after(stayDuration, () => {
           if (this.activeHoles[pickIdx] !== null) {
             this.hideMole(pickIdx);
           }
-        }, stayDuration);
+        });
       }
 
       const nextSpawnDelay = Math.max(350, 750 - (30 - this.timeLeft) * 12);
-      this.spawnTimer = setTimeout(popCycle, nextSpawnDelay);
+      this.spawnTimer = this.ctx.scheduler.after(nextSpawnDelay, popCycle);
     };
 
     popCycle();
@@ -115,9 +118,8 @@ export default {
 
     const actor = hole.querySelector('.mole-actor');
     if (actor) {
-      actor.textContent = type === 'golden' ? 'G' : 'M';
-      actor.style.color = type === 'golden' ? 'var(--status-coin)' : '#ffffff';
-      actor.style.transform = 'translateY(0%)';
+      actor.innerHTML = moleFace(type === 'golden' ? '#f2b705' : '#9a6b52');
+      actor.style.transform = 'translateY(8%)';
     }
   },
 
@@ -149,20 +151,20 @@ export default {
         this.score += points;
 
         if (moleType === 'golden') {
-          this.ctx.fx.playTone(880, 'sine', 0.05, 0.15);
+          this.ctx.fx.playTone(880, 'sine', 0.05, 0.2);
         } else {
-          this.ctx.fx.playTone(520, 'triangle', 0.03, 0.12);
+          this.ctx.fx.playTone(520, 'triangle', 0.03, 0.15);
         }
 
         this.ctx.fx.shake('soft');
 
         const actor = hole.querySelector('.mole-actor');
         if (actor) {
-          actor.textContent = '+';
+          actor.innerHTML = HIT_BURST;
         }
 
         this.activeHoles[idx] = null;
-        setTimeout(() => this.hideMole(idx), 100);
+        this.ctx.scheduler.after(120, () => this.hideMole(idx));
 
         this.updateUI();
       }
@@ -172,7 +174,7 @@ export default {
   resetAllHolesVisual() {
     document.querySelectorAll('.mole-actor').forEach(actor => {
       actor.style.transform = 'translateY(100%)';
-      actor.textContent = '';
+      actor.innerHTML = '';
     });
   },
 
@@ -190,46 +192,29 @@ export default {
 
     const isWin = (this.score >= 120);
 
-    if (isWin) {
-      this.ctx.fx.sfx.victory();
-    } else {
-      this.ctx.fx.sfx.defeat();
-    }
-
     this.ctx.recordResult(isWin ? 'WIN' : 'LOSS', {
       score: this.score,
-      summary: `Score: ${this.score} pts (${isWin ? 'Target Beat!' : 'Try Again'})`
+      summary: isWin
+        ? `You scored ${this.score}. That beats the 120 target.`
+        : `You scored ${this.score}. You needed 120.`
     });
   },
 
   clearTimers() {
-    if (this.clockTimer) clearInterval(this.clockTimer);
-    if (this.spawnTimer) clearTimeout(this.spawnTimer);
+    if (this.clockTimer) this.ctx.scheduler.cancel(this.clockTimer);
+    if (this.spawnTimer) this.ctx.scheduler.cancel(this.spawnTimer);
   },
 
-  pause() {
-    this.isPlaying = false;
-    this.clearTimers();
-  },
-
-  resume() {
-    if (this.timeLeft > 0 && !this.isPlaying) {
-      this.isPlaying = true;
-      this.clockTimer = setInterval(() => {
-        this.timeLeft--;
-        this.updateUI();
-        if (this.timeLeft <= 0) this.endMatch();
-      }, 1000);
-      this.startSpawning();
-    }
-  },
+  // the scheduler is paused by the app, nothing to do here
+  pause() {},
+  resume() {},
 
   restart() {
     this.start();
   },
 
   destroy() {
-    this.clearTimers();
+    this.isPlaying = false;
     this.container = null;
   }
 };

@@ -1,7 +1,12 @@
+// tictactoe.js: Tic Tac Toe against a bot (Casual, Medium or Smart) or a friend on the same phone.
+// Smart uses minimax, so it never loses.
+import { Stats } from '../stats.js';
+
 export default {
   id: 'tictactoe',
   title: 'Tic Tac Toe',
-  accent: '#2f81f7',
+  accent: '#3d63e0',
+  vsOpponent: true,
 
   ctx: null,
   container: null,
@@ -9,9 +14,8 @@ export default {
   board: Array(9).fill(null),
   isPlayerTurn: true,
   isLocked: false,
-  difficulty: 'Impossible', // 'Casual' | 'Medium' | 'Impossible'
+  difficulty: 'Medium', // 'Casual' | 'Medium' | 'Impossible' | '2P_LOCAL'
   starterTurn: 'X',
-  seriesScore: { player: 0, ai: 0, ties: 0 },
 
   mount(el, sessionCtx) {
     this.container = el;
@@ -19,52 +23,32 @@ export default {
 
     this.container.innerHTML = `
       <div class="arena-dual-layout">
-        <div class="ttt-grid-box" style="position:relative;">
+        <div class="ttt-grid-box">
           <div class="ttt-cells-wrapper" id="tttGridWrapper">
             ${Array(9).fill(0).map((_, i) => `<button type="button" class="cell" data-idx="${i}" aria-label="Square ${i + 1}"></button>`).join('')}
           </div>
           <svg id="tttWinningRay" style="position:absolute; inset:0; width:100%; height:100%; pointer-events:none; display:none;" viewBox="0 0 310 310">
-            <line id="tttRayLine" x1="0" y1="0" x2="0" y2="0" stroke="var(--status-win)" stroke-width="4" stroke-linecap="round"/>
+            <line id="tttRayLine" x1="0" y1="0" x2="0" y2="0" stroke="var(--status-win)" stroke-width="5" stroke-linecap="round"/>
           </svg>
         </div>
 
         <div class="arena-side-controls">
-          <div class="telemetry-cell" style="text-align:center; padding:12px;">
-            <span class="t-label">Turn</span>
-            <div id="tttTurnStatus" class="t-val" style="font-size:1.15rem; margin:2px 0; color:var(--brand-accent);">
-              Your turn (X)
-            </div>
-            <div id="tttSubStatus" style="font-size:0.75rem; color:var(--text-dim);">
-              Pick an open square
+          <div class="stat-box" style="text-align:center;">
+            <div id="tttTurnStatus" class="stat-value">Your turn (X)</div>
+            <div id="tttSubStatus" class="stat-label">Tap an empty square</div>
+          </div>
+
+          <div class="stat-box" style="gap:8px;">
+            <span class="stat-label">Who do you play?</span>
+            <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:6px;">
+              <button type="button" class="btn-nav-pill" id="btnTttCasual">Casual bot</button>
+              <button type="button" class="btn-nav-pill is-on" id="btnTttMedium">Medium bot</button>
+              <button type="button" class="btn-nav-pill" id="btnTttImpossible">Smart bot</button>
+              <button type="button" class="btn-nav-pill" id="btnTttTwoPlayer">A friend</button>
             </div>
           </div>
 
-          <div class="telemetry-cell" style="padding:10px;">
-            <span class="t-label" style="text-align:center; margin-bottom:6px;">Score</span>
-            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; text-align:center;">
-              <div>
-                <div style="font-size:0.7rem; color:var(--text-sub); font-weight:600;">YOU</div>
-                <div id="tttScorePlayer" class="t-val" style="font-size:1.2rem; color:var(--brand-accent);">0</div>
-              </div>
-              <div>
-                <div style="font-size:0.7rem; color:var(--text-sub); font-weight:600;">DRAW</div>
-                <div id="tttScoreTies" class="t-val" style="font-size:1.2rem; color:var(--text-main);">0</div>
-              </div>
-              <div>
-                <div style="font-size:0.7rem; color:var(--text-sub); font-weight:600;">BOT</div>
-                <div id="tttScoreAI" class="t-val" style="font-size:1.2rem; color:var(--status-loss);">0</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="telemetry-cell" style="gap:6px;">
-            <span class="t-label">Difficulty</span>
-            <div style="display:flex; gap:6px;">
-              <button type="button" class="btn-nav-pill" id="btnTttCasual" style="flex:1; justify-content:center; font-size:0.75rem;">Easy</button>
-              <button type="button" class="btn-nav-pill" id="btnTttMedium" style="flex:1; justify-content:center; font-size:0.75rem;">Medium</button>
-              <button type="button" class="btn-nav-pill" id="btnTttImpossible" style="flex:1; justify-content:center; font-size:0.75rem; border-color:var(--brand-accent);">Hard</button>
-            </div>
-          </div>
+          <div class="stat-label" id="tttRecord" style="text-align:center;"></div>
         </div>
       </div>
     `;
@@ -73,7 +57,7 @@ export default {
   },
 
   start(opts = {}) {
-    this.difficulty = opts.difficulty || this.difficulty || 'Impossible';
+    this.difficulty = opts.difficulty || this.difficulty;
     this.setPresetUI(this.difficulty);
 
     this.board = Array(9).fill(null);
@@ -82,46 +66,59 @@ export default {
 
     this.resetBoardVisuals();
     this.updateStatus();
+    this.updateRecord();
 
-    if (!this.isPlayerTurn) {
+    if (!this.isPlayerTurn && this.difficulty !== '2P_LOCAL') {
       this.triggerAITurn();
     }
   },
 
   setPresetUI(diff) {
     this.difficulty = diff;
-    ['btnTttCasual', 'btnTttMedium', 'btnTttImpossible'].forEach(id => {
-      const btn = document.getElementById(id);
-      if (btn) btn.style.borderColor = 'var(--border-line)';
-    });
-
-    if (diff === 'Casual') document.getElementById('btnTttCasual')?.style.setProperty('border-color', 'var(--brand-accent)');
-    else if (diff === 'Medium') document.getElementById('btnTttMedium')?.style.setProperty('border-color', 'var(--brand-accent)');
-    else if (diff === 'Impossible') document.getElementById('btnTttImpossible')?.style.setProperty('border-color', 'var(--brand-accent)');
+    const buttons = {
+      Casual: 'btnTttCasual',
+      Medium: 'btnTttMedium',
+      Impossible: 'btnTttImpossible',
+      '2P_LOCAL': 'btnTttTwoPlayer'
+    };
+    for (const [name, id] of Object.entries(buttons)) {
+      document.getElementById(id)?.classList.toggle('is-on', name === diff);
+    }
   },
 
   setupListeners() {
     document.getElementById('btnTttCasual')?.addEventListener('click', () => this.start({ difficulty: 'Casual' }));
     document.getElementById('btnTttMedium')?.addEventListener('click', () => this.start({ difficulty: 'Medium' }));
     document.getElementById('btnTttImpossible')?.addEventListener('click', () => this.start({ difficulty: 'Impossible' }));
+    document.getElementById('btnTttTwoPlayer')?.addEventListener('click', () => this.start({ difficulty: '2P_LOCAL' }));
 
     document.getElementById('tttGridWrapper')?.addEventListener('click', (e) => {
       const cell = e.target.closest('.cell');
-      if (!cell || this.isLocked || !this.isPlayerTurn) return;
+      if (!cell || this.isLocked) return;
 
       const idx = parseInt(cell.getAttribute('data-idx'), 10);
       if (this.board[idx] !== null) return;
 
-      this.makeMove(idx, 'X');
-      const winInfo = this.checkWin(this.board);
-      if (winInfo) {
-        this.handleResolution(winInfo);
-      } else if (this.isBoardFull(this.board)) {
-        this.handleResolution('DRAW');
-      } else {
-        this.isPlayerTurn = false;
-        this.updateStatus();
-        this.triggerAITurn();
+      if (this.difficulty === '2P_LOCAL') {
+        const symbol = this.isPlayerTurn ? 'X' : 'O';
+        this.makeMove(idx, symbol);
+        const winInfo = this.checkWin(this.board);
+        if (winInfo) this.handleResolution(winInfo);
+        else if (this.isBoardFull(this.board)) this.handleResolution('DRAW');
+        else {
+          this.isPlayerTurn = !this.isPlayerTurn;
+          this.updateStatus();
+        }
+      } else if (this.isPlayerTurn) {
+        this.makeMove(idx, 'X');
+        const winInfo = this.checkWin(this.board);
+        if (winInfo) this.handleResolution(winInfo);
+        else if (this.isBoardFull(this.board)) this.handleResolution('DRAW');
+        else {
+          this.isPlayerTurn = false;
+          this.updateStatus();
+          this.triggerAITurn();
+        }
       }
     });
   },
@@ -132,16 +129,16 @@ export default {
     if (cell) {
       cell.textContent = symbol;
       cell.classList.add(symbol.toLowerCase());
-      this.ctx.fx.playTone(symbol === 'X' ? 620 : 420, 'triangle', 0.04, 0.1);
+      this.ctx.fx.playTone(symbol === 'X' ? 620 : 420, 'triangle', 0.04, 0.12);
     }
   },
 
   triggerAITurn() {
     this.isLocked = true;
     const sub = document.getElementById('tttSubStatus');
-    if (sub) sub.textContent = 'Bot is thinking...';
+    if (sub) sub.textContent = 'Thinking...';
 
-    this.ctx.scheduler.after(300, () => {
+    this.ctx.scheduler.after(350, () => {
       const move = this.computeAIMove();
       this.makeMove(move, 'O');
 
@@ -165,11 +162,11 @@ export default {
     }
 
     if (this.difficulty === 'Casual') {
-      if (Math.random() < 0.5) {
+      if (Math.random() < 0.45) {
         return available[Math.floor(Math.random() * available.length)];
       }
     } else if (this.difficulty === 'Medium') {
-      if (Math.random() < 0.25) {
+      if (Math.random() < 0.3) {
         return available[Math.floor(Math.random() * available.length)];
       }
     }
@@ -250,40 +247,38 @@ export default {
     this.isLocked = true;
     const isWin = typeof result === 'object';
 
+    const label = document.getElementById('tttTurnStatus');
+    const sub = document.getElementById('tttSubStatus');
+    if (label) label.textContent = 'Game over';
+    if (sub) sub.textContent = isWin ? `${result.winner} got three in a row` : 'It is a draw';
+
     if (isWin) {
       const { winner, line } = result;
       this.drawWinningRay(line);
 
-      if (winner === 'X') {
-        this.seriesScore.player++;
-        this.ctx.fx.sfx.victory();
-        this.ctx.recordResult('WIN', {
-          mode: this.difficulty,
-          summary: `Won (${this.difficulty === 'Impossible' ? 'Hard' : this.difficulty})`
-        });
-      } else {
-        this.seriesScore.ai++;
-        this.ctx.fx.sfx.defeat();
-        this.ctx.recordResult('LOSS', {
-          mode: this.difficulty,
-          summary: `Lost (${this.difficulty === 'Impossible' ? 'Hard' : this.difficulty})`
-        });
-      }
+      line.forEach(idx => {
+        document.querySelector(`.cell[data-idx="${idx}"]`)?.classList.add('winning-cell');
+      });
+
+      // the result dialog opens a little later so the winning line can be seen
+      const level = { Casual: 'casual', Medium: 'medium', Impossible: 'smart' }[this.difficulty];
+      this.ctx.scheduler.after(900, () => {
+        if (this.difficulty === '2P_LOCAL') {
+          this.ctx.recordResult(winner === 'X' ? 'WIN' : 'LOSS', { counts: false, summary: `Player ${winner === 'X' ? 1 : 2} (${winner}) won.` });
+        } else if (winner === 'X') {
+          this.ctx.recordResult('WIN', { mode: this.difficulty, summary: `You beat the ${level} bot.` });
+        } else {
+          this.ctx.recordResult('LOSS', { mode: this.difficulty, summary: `The ${level} bot won this one.` });
+        }
+      });
     } else {
-      this.seriesScore.ties++;
-      this.ctx.fx.playTone(330, 'triangle', 0.12, 0.1);
-      this.ctx.recordResult('DRAW', {
-        mode: this.difficulty,
-        summary: `Draw (${this.difficulty === 'Impossible' ? 'Hard' : this.difficulty})`
+      this.ctx.scheduler.after(500, () => {
+        this.ctx.recordResult('DRAW', { mode: this.difficulty, counts: this.difficulty !== '2P_LOCAL', summary: 'Nobody got three in a row.' });
       });
     }
 
-    this.updateScoreboard();
+    // whoever did not start goes first next time
     this.starterTurn = this.starterTurn === 'X' ? 'O' : 'X';
-
-    this.ctx.scheduler.after(2000, () => {
-      this.start({ difficulty: this.difficulty });
-    });
   },
 
   drawWinningRay(line) {
@@ -291,10 +286,11 @@ export default {
     const lineEl = document.getElementById('tttRayLine');
     if (!svg || !lineEl) return;
 
+    // cell centres in the 310 by 310 viewBox
     const centers = [
-      [54, 54],   [155, 54],  [256, 54],
-      [54, 155],  [155, 155], [256, 155],
-      [54, 256],  [155, 256], [256, 256]
+      [55, 55],   [155, 55],  [255, 55],
+      [55, 155],  [155, 155], [255, 155],
+      [55, 255],  [155, 255], [255, 255]
     ];
 
     const [startIdx, , endIdx] = line;
@@ -324,18 +320,21 @@ export default {
     const sub = document.getElementById('tttSubStatus');
     if (!label) return;
 
-    label.textContent = this.isPlayerTurn ? 'Your turn (X)' : 'Bot turn (O)';
-    label.style.color = this.isPlayerTurn ? 'var(--brand-accent)' : 'var(--status-loss)';
-    if (sub) sub.textContent = this.isPlayerTurn ? 'Pick an open square' : 'Bot is thinking...';
+    if (this.difficulty === '2P_LOCAL') {
+      label.textContent = this.isPlayerTurn ? 'Player 1 (X)' : 'Player 2 (O)';
+      if (sub) sub.textContent = 'Pass the phone after your move';
+    } else {
+      label.textContent = this.isPlayerTurn ? 'Your turn (X)' : "Bot's turn (O)";
+      if (sub) sub.textContent = this.isPlayerTurn ? 'Tap an empty square' : 'Thinking...';
+    }
   },
 
-  updateScoreboard() {
-    const p = document.getElementById('tttScorePlayer');
-    const t = document.getElementById('tttScoreTies');
-    const a = document.getElementById('tttScoreAI');
-    if (p) p.textContent = this.seriesScore.player;
-    if (t) t.textContent = this.seriesScore.ties;
-    if (a) a.textContent = this.seriesScore.ai;
+  // your running record against the bots, from the saved stats
+  updateRecord() {
+    const el = document.getElementById('tttRecord');
+    if (!el) return;
+    const g = Stats.get('tictactoe');
+    el.textContent = g.plays ? `Your record: ${g.wins} won, ${g.draws} drawn, ${g.losses} lost` : '';
   },
 
   pause() {
@@ -347,8 +346,6 @@ export default {
   },
 
   restart() {
-    this.seriesScore = { player: 0, ai: 0, ties: 0 };
-    this.updateScoreboard();
     this.start({ difficulty: this.difficulty });
   },
 

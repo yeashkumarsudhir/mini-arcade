@@ -1,3 +1,4 @@
+// store.js: small settings store that remembers its values in localStorage.
 export class Store {
   constructor(storageKey, initialState) {
     this.storageKey = storageKey;
@@ -18,7 +19,7 @@ export class Store {
     try {
       localStorage.setItem(this.storageKey, JSON.stringify(this.state));
     } catch (err) {
-      console.warn('[Store] LocalStorage write failed:', err);
+      console.warn('Could not save settings:', err);
     }
   }
 
@@ -56,18 +57,15 @@ export class Store {
       try {
         sub(key, value, this.state);
       } catch (err) {
-        console.error('[Store] Subscriber error:', err);
+        console.error('Settings listener failed:', err);
       }
     }
   }
 }
 
-export const SettingsStore = new Store('cae_settings_state', {
-  theme: 'dark',
+export const SettingsStore = new Store('mini_arcade_settings', {
   muted: false,
-  volumeMusic: 0.04,
   volumeSfx: 0.15,
   reducedMotion: false,
-  haptics: true,
-  lang: 'en'
+  haptics: true
 });

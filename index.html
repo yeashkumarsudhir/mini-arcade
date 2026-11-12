@@ -4,448 +4,409 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
   <title>Mini Arcade</title>
-  <meta name="description" content="A simple collection of classic offline browser games built with vanilla JavaScript.">
+  <meta name="description" content="Eleven small games that run in the browser and keep working offline.">
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0e1117">
+  <meta name="theme-color" content="#f2f6fb">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="style.css">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="apple-touch-icon" href="icons/maskable-512.png">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Mukta:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 
   <script>
-    (function() {
-      const persisted = localStorage.getItem('cae_settings_theme');
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const theme = persisted || (prefersDark ? 'dark' : 'light');
-      document.documentElement.setAttribute('data-theme', theme);
+    // set the theme before the page paints so it doesn't flash
+    (function () {
+      var saved = null;
+      try { saved = localStorage.getItem('mini_arcade_theme') || localStorage.getItem('cae_settings_theme'); } catch (e) {}
+      var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.setAttribute('data-theme', saved || (dark ? 'dark' : 'light'));
     })();
   </script>
 </head>
 <body>
 
-  <!-- Icons -->
+  <!-- icons, used with <use href="#icon-name"> -->
   <svg xmlns="http://www.w3.org/2000/svg" style="display:none;" aria-hidden="true">
-    <symbol id="icon-logo" viewBox="0 0 24 24">
-      <rect x="2" y="6" width="20" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="2"/>
-      <path d="M6 12h4m-2-2v4m7-2h.01m3 0h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    <symbol id="icon-logo" viewBox="0 0 32 32">
+      <rect x="4" y="4" width="24" height="24" rx="5" fill="none" stroke="currentColor" stroke-width="2.4"/>
+      <circle cx="11" cy="11" r="2.4" fill="currentColor"/>
+      <circle cx="16" cy="16" r="2.4" fill="currentColor"/>
+      <circle cx="21" cy="21" r="2.4" fill="currentColor"/>
     </symbol>
 
     <symbol id="icon-sound-on" viewBox="0 0 24 24">
-      <path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
+      <path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
     </symbol>
 
     <symbol id="icon-sound-off" viewBox="0 0 24 24">
-      <path fill="currentColor" d="M4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+      <path fill="currentColor" d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
     </symbol>
 
-    <symbol id="icon-theme-night" viewBox="0 0 24 24">
+    <symbol id="icon-theme-dark" viewBox="0 0 24 24">
       <path fill="currentColor" d="M12.3 2a10 10 0 0 0-1.9 19.8 10 10 0 0 1 11.6-11.6A10 10 0 0 1 12.3 2z"/>
     </symbol>
 
-    <symbol id="icon-theme-day" viewBox="0 0 24 24">
-      <path fill="currentColor" d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0-5a1 1 0 0 0 1-1V1a1 1 0 0 0-2 0v1a1 1 0 0 0 1 1zm0 19a1 1 0 0 0-1 1v1a1 1 0 0 0 2 0v-1a1 1 0 0 0-1-1zm10-10a1 1 0 0 0 0-2h-1a1 1 0 0 0 0 2h1zM4 12a1 1 0 0 0-1-1H2a1 1 0 0 0 0 2h1a1 1 0 0 0 1-1z"/>
+    <symbol id="icon-theme-light" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="4.5" fill="currentColor"/>
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="icon-pause" viewBox="0 0 24 24">
+      <rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/>
+      <rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/>
+    </symbol>
+
+    <symbol id="icon-quit" viewBox="0 0 24 24">
+      <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
     </symbol>
 
     <symbol id="icon-game-ludo" viewBox="0 0 32 32">
-      <rect x="3" y="3" width="26" height="26" rx="4" fill="none" stroke="#E53935" stroke-width="2.5"/>
-      <circle cx="10" cy="10" r="3" fill="#E53935"/>
-      <circle cx="22" cy="10" r="3" fill="#43A047"/>
-      <circle cx="22" cy="22" r="3" fill="#FDD835"/>
-      <circle cx="10" cy="22" r="3" fill="#1E88E5"/>
-      <path d="M16 3v26M3 16h26" stroke="#2B2B2B" stroke-width="1.8"/>
+      <rect x="3" y="3" width="26" height="26" rx="4" style="fill:var(--bg-panel)" stroke="currentColor" stroke-width="2"/>
+      <circle cx="10" cy="10" r="3.4" fill="#d8504e"/>
+      <circle cx="22" cy="10" r="3.4" fill="#3fa66a"/>
+      <circle cx="22" cy="22" r="3.4" fill="#f2b705"/>
+      <circle cx="10" cy="22" r="3.4" fill="#3d63e0"/>
+      <path d="M16 3v26M3 16h26" stroke="currentColor" stroke-width="1.4"/>
     </symbol>
 
     <symbol id="icon-game-snake" viewBox="0 0 32 32">
-      <path d="M6 24h6a4 4 0 0 0 4-4v-4a4 4 0 0 1 4-4h6" fill="none" stroke="#2ea043" stroke-width="3" stroke-linecap="round"/>
-      <circle cx="26" cy="12" r="3" fill="#2ea043"/>
+      <path d="M6 25h6a4 4 0 0 0 4-4v-4a4 4 0 0 1 4-4h5" fill="none" stroke="#3fa66a" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="26" cy="13" r="3.4" fill="#3fa66a" stroke="currentColor" stroke-width="1.6"/>
+      <circle cx="27" cy="12" r="0.9" fill="currentColor"/>
+      <circle cx="6" cy="25" r="2.2" fill="#d8504e"/>
     </symbol>
 
     <symbol id="icon-game-tictactoe" viewBox="0 0 32 32">
-      <circle cx="11" cy="11" r="5" fill="none" stroke="#2f81f7" stroke-width="2.5"/>
-      <path d="M17 17l8 8m0-8l-8 8" stroke="#f85149" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M12 4v24M20 4v24M4 12h24M4 20h24" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      <circle cx="8" cy="8" r="2.6" fill="none" stroke="#3d63e0" stroke-width="2"/>
+      <path d="M17 17l6 6m0-6l-6 6" stroke="#d8504e" stroke-width="2.2" stroke-linecap="round"/>
     </symbol>
 
     <symbol id="icon-game-memory" viewBox="0 0 32 32">
-      <rect x="5" y="6" width="10" height="14" rx="2" fill="none" stroke="#8b949e" stroke-width="2"/>
-      <rect x="17" y="12" width="10" height="14" rx="2" fill="#2f81f7" stroke-width="2"/>
+      <rect x="4" y="6" width="12" height="17" rx="2.5" style="fill:var(--bg-panel)" stroke="currentColor" stroke-width="2"/>
+      <rect x="16" y="10" width="12" height="17" rx="2.5" fill="#f2b705" stroke="currentColor" stroke-width="2"/>
+      <circle cx="22" cy="18.5" r="2.6" style="fill:var(--bg-panel)"/>
     </symbol>
 
     <symbol id="icon-game-flappy" viewBox="0 0 32 32">
-      <ellipse cx="14" cy="16" rx="8" ry="6" fill="#d29922"/>
-      <polygon points="20,15 25,17 20,19" fill="#f85149"/>
-      <circle cx="16" cy="14" r="1.5" fill="#000"/>
+      <ellipse cx="15" cy="16" rx="9" ry="7" fill="#f2b705" stroke="currentColor" stroke-width="2"/>
+      <path d="M23 15l5 2-5 2z" fill="#d8504e" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+      <circle cx="18" cy="13.5" r="1.6" style="fill:var(--bg-panel)" stroke="currentColor" stroke-width="1"/>
+      <path d="M7 17c-2 2-4.5 0-4.5-2s2.5-2 4.5 0z" fill="none" stroke="currentColor" stroke-width="1.6"/>
     </symbol>
 
     <symbol id="icon-game-breakout" viewBox="0 0 32 32">
-      <rect x="4" y="6" width="6" height="4" rx="1" fill="#f85149"/>
-      <rect x="13" y="6" width="6" height="4" rx="1" fill="#d29922"/>
-      <rect x="22" y="6" width="6" height="4" rx="1" fill="#2ea043"/>
-      <circle cx="15" cy="20" r="2" fill="#ffffff"/>
-      <rect x="9" y="26" width="14" height="3" rx="1" fill="#2f81f7"/>
+      <rect x="3" y="5" width="7.5" height="4.5" rx="1" fill="#d8504e"/>
+      <rect x="12.2" y="5" width="7.5" height="4.5" rx="1" fill="#f2b705"/>
+      <rect x="21.5" y="5" width="7.5" height="4.5" rx="1" fill="#3fa66a"/>
+      <rect x="7.5" y="11.5" width="7.5" height="4.5" rx="1" fill="#3d63e0"/>
+      <rect x="17" y="11.5" width="7.5" height="4.5" rx="1" fill="#f2b705"/>
+      <circle cx="16" cy="21" r="2.2" fill="currentColor"/>
+      <rect x="9" y="26" width="14" height="3.2" rx="1.2" fill="currentColor"/>
     </symbol>
 
     <symbol id="icon-game-2048" viewBox="0 0 32 32">
-      <rect x="4" y="4" width="24" height="24" rx="4" fill="#21262d" stroke="#d29922" stroke-width="2"/>
-      <rect x="7" y="7" width="8" height="8" rx="2" fill="#d29922"/>
-      <rect x="17" y="7" width="8" height="8" rx="2" fill="#f85149"/>
+      <rect x="3" y="3" width="26" height="26" rx="4" style="fill:var(--bg-surface)" stroke="currentColor" stroke-width="2"/>
+      <rect x="6.5" y="6.5" width="8" height="8" rx="2" fill="#f2b705"/>
+      <rect x="17.5" y="6.5" width="8" height="8" rx="2" fill="#e8893c"/>
+      <rect x="6.5" y="17.5" width="8" height="8" rx="2" fill="#d8504e"/>
+      <rect x="17.5" y="17.5" width="8" height="8" rx="2" fill="#3fa66a"/>
     </symbol>
 
     <symbol id="icon-game-minesweeper" viewBox="0 0 32 32">
-      <circle cx="16" cy="16" r="6" fill="#f85149"/>
-      <line x1="16" y1="6" x2="16" y2="26" stroke="#f85149" stroke-width="2"/>
-      <line x1="6" y1="16" x2="26" y2="16" stroke="#f85149" stroke-width="2"/>
+      <path d="M16 4v24M4 16h24M7.5 7.5l17 17M24.5 7.5l-17 17" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <circle cx="16" cy="16" r="7" fill="currentColor"/>
+      <circle cx="13.5" cy="13.5" r="1.8" style="fill:var(--bg-panel)"/>
     </symbol>
 
     <symbol id="icon-game-mole" viewBox="0 0 32 32">
-      <ellipse cx="16" cy="22" rx="11" ry="5" fill="#21262d" stroke="#30363d" stroke-width="1.5"/>
-      <path d="M10 22 C10 12, 22 12, 22 22 Z" fill="#8d5b4c"/>
-      <circle cx="14" cy="16" r="1.5" fill="#000"/>
-      <circle cx="18" cy="16" r="1.5" fill="#000"/>
+      <path d="M8 24c0-10 4-14 8-14s8 4 8 14z" fill="#9a6b52" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+      <circle cx="13.5" cy="17" r="1.4" fill="currentColor"/>
+      <circle cx="18.5" cy="17" r="1.4" fill="currentColor"/>
+      <ellipse cx="16" cy="20" rx="2.4" ry="1.5" fill="#d8504e"/>
+      <path d="M3 25h26" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
     </symbol>
 
     <symbol id="icon-game-connectfour" viewBox="0 0 32 32">
-      <rect x="4" y="6" width="24" height="20" rx="3" fill="#1f3a60" stroke="#000" stroke-width="1.5"/>
-      <circle cx="10" cy="12" r="2.5" fill="#f85149"/>
-      <circle cx="16" cy="12" r="2.5" fill="#d29922"/>
-      <circle cx="22" cy="12" r="2.5" fill="#f85149"/>
+      <rect x="3" y="5" width="26" height="22" rx="3.5" fill="#3d63e0" stroke="currentColor" stroke-width="2"/>
+      <circle cx="9" cy="11" r="2.8" fill="#d8504e"/>
+      <circle cx="16" cy="11" r="2.8" fill="#f2b705"/>
+      <circle cx="23" cy="11" r="2.8" fill="#d8504e"/>
+      <circle cx="9" cy="20" r="2.8" fill="#f2b705"/>
+      <circle cx="16" cy="20" r="2.8" fill="#d8504e"/>
+      <circle cx="23" cy="20" r="2.8" style="fill:var(--bg-panel)"/>
     </symbol>
 
     <symbol id="icon-game-wordguess" viewBox="0 0 32 32">
-      <rect x="4" y="6" width="6" height="8" rx="1.5" fill="#2ea043"/>
-      <rect x="13" y="6" width="6" height="8" rx="1.5" fill="#d29922"/>
-      <rect x="22" y="6" width="6" height="8" rx="1.5" fill="#30363d"/>
+      <rect x="3.5" y="5.5" width="7" height="9" rx="1.6" fill="#3fa66a" stroke="currentColor" stroke-width="1.6"/>
+      <rect x="12.5" y="5.5" width="7" height="9" rx="1.6" fill="#f2b705" stroke="currentColor" stroke-width="1.6"/>
+      <rect x="21.5" y="5.5" width="7" height="9" rx="1.6" style="fill:var(--bg-surface)" stroke="currentColor" stroke-width="1.6"/>
+      <rect x="3.5" y="17.5" width="7" height="9" rx="1.6" style="fill:var(--bg-surface)" stroke="currentColor" stroke-width="1.6"/>
+      <rect x="12.5" y="17.5" width="7" height="9" rx="1.6" fill="#3fa66a" stroke="currentColor" stroke-width="1.6"/>
+      <rect x="21.5" y="17.5" width="7" height="9" rx="1.6" fill="#3fa66a" stroke="currentColor" stroke-width="1.6"/>
     </symbol>
   </svg>
 
   <canvas id="fxCanvas" class="fx-canvas" aria-hidden="true"></canvas>
+  <div id="liveAnnouncer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+  <div id="toast" class="toast" role="status"></div>
 
   <div class="arcade-container" id="mainShell">
-    
-    <!-- Top Nav -->
+
     <header class="top-nav">
-      <a href="#/" class="nav-brand" aria-label="Mini Arcade Home">
-        <svg class="brand-icon"><use href="#icon-logo"/></svg>
+      <a href="#/" class="nav-brand" aria-label="Mini Arcade home">
+        <svg class="brand-icon" aria-hidden="true"><use href="#icon-logo"/></svg>
         <span class="brand-text">Mini Arcade</span>
       </a>
 
       <div class="nav-actions">
-        <button type="button" class="btn-nav-pill" id="btnAudioToggle" title="Toggle Sound">
-          <svg class="btn-icon-svg" id="iconAudioState"><use href="#icon-sound-on"/></svg>
-          <span class="btn-label-responsive" id="labelAudioState">SOUND</span>
+        <button type="button" class="btn-nav-pill" id="btnAudioToggle" title="Sound on or off" aria-label="Sound on or off">
+          <svg class="btn-icon-svg" id="iconAudioState" aria-hidden="true"><use href="#icon-sound-on"/></svg>
+          <span class="btn-label-responsive" id="labelAudioState">Sound</span>
         </button>
 
-        <button type="button" class="btn-nav-pill" id="btnThemeToggle" title="Toggle Theme">
-          <svg class="btn-icon-svg" id="iconThemeState"><use href="#icon-theme-night"/></svg>
-          <span class="btn-label-responsive" id="labelThemeState">NIGHT</span>
+        <button type="button" class="btn-nav-pill" id="btnThemeToggle" title="Switch light or dark" aria-label="Switch light or dark">
+          <svg class="btn-icon-svg" id="iconThemeState" aria-hidden="true"><use href="#icon-theme-dark"/></svg>
+          <span class="btn-label-responsive" id="labelThemeState">Dark</span>
         </button>
 
-        <button type="button" class="btn-nav-pill" id="btnProfileDrawerOpen" title="Player Profile">
-          <span id="navAvatarEmoji" class="user-avatar-pill">P1</span>
-          <span class="btn-label-responsive" id="navCallsign">Player 1</span>
+        <button type="button" class="btn-nav-pill" id="btnProfileDrawerOpen" title="Your profile" aria-label="Open your profile">
+          <span class="avatar" id="navAvatar">P</span>
+          <span class="btn-label-responsive" id="navName">Player 1</span>
         </button>
       </div>
     </header>
 
-    <!-- Main Lobby View -->
     <main id="viewLobby">
-      <section class="dashboard-top-row">
-        <div class="hero-banner">
-          <span class="hero-tag">Featured Game</span>
-          <div class="hero-info">
-            <h2>Ludo</h2>
-            <p>Play with 2, 3, or 4 players. Play with friends locally or practice against the bot.</p>
-          </div>
-          <div class="hero-cta-group">
-            <button type="button" class="btn-cta-primary" id="btnHeroDeploy">Play Match</button>
-            <button type="button" class="btn-cta-secondary" id="btnHeroContinue">Resume Saved</button>
-          </div>
-        </div>
+      <p class="intro-line" id="introLine"></p>
 
-        <div class="telemetry-card">
-          <div class="telemetry-cell">
-            <span class="t-label">Playtime</span>
-            <span class="t-val" id="hudPlaytime">0m</span>
-          </div>
-          <div class="telemetry-cell">
-            <span class="t-label">Matches</span>
-            <span class="t-val" id="hudMatches">0</span>
-          </div>
-          <div class="telemetry-cell">
-            <span class="t-label">Win Rate</span>
-            <span class="t-val" id="hudWinRate">0%</span>
+      <section class="hero-banner" aria-labelledby="heroTitle">
+        <div class="hero-banner-top">
+          <svg class="card-icon-svg" aria-hidden="true"><use href="#icon-game-ludo"/></svg>
+          <div class="hero-info">
+            <h2 id="heroTitle">Ludo</h2>
+            <p>2 se 4 players. Bots ke saath khelo, ya ek hi phone pe dosto ke saath.</p>
           </div>
         </div>
+        <div class="hero-cta-group">
+          <button type="button" class="btn-cta-primary" id="btnHeroNew">New game</button>
+          <button type="button" class="btn-cta-secondary" id="btnHeroContinue" hidden>Continue</button>
+        </div>
+        <span class="card-meta-stat" id="metaLudoStat" style="text-align:left; max-width:none;"></span>
       </section>
 
-      <!-- Active Games Grid -->
       <section>
         <div class="lobby-header">
-          <h2 class="section-title">All Games</h2>
-          <div class="live-indicator"><span class="live-dot"></span> Ready</div>
+          <h2 class="section-title">More games</h2>
         </div>
 
-        <div class="game-grid" id="gameGridContainer">
-          <!-- 1. Ludo -->
-          <div class="game-card-wrapper">
-            <div class="game-card" data-game="ludo" role="button" tabindex="0">
-              <span class="card-badge">Board</span>
-              <svg class="card-icon-svg"><use href="#icon-game-ludo"/></svg>
-              <div class="game-card-content">
-                <h3>Ludo</h3>
-                <p>2 to 4 players, pass & play or against bots.</p>
-                <span class="card-meta-stat" id="metaLudoStat">Won: 0 / 0</span>
-              </div>
-              <span class="btn-card-deploy">Play</span>
-            </div>
-          </div>
-
-          <!-- 2. Snake -->
-          <div class="game-card-wrapper">
-            <div class="game-card" data-game="snake" role="button" tabindex="0">
-              <span class="card-badge">Classic</span>
-              <svg class="card-icon-svg"><use href="#icon-game-snake"/></svg>
+        <ul class="game-grid" id="gameGridContainer">
+          <li>
+            <a class="game-card" href="#/game/snake" data-game="snake">
+              <svg class="card-icon-svg" aria-hidden="true"><use href="#icon-game-snake"/></svg>
               <div class="game-card-content">
                 <h3>Snake</h3>
-                <p>Eat pellets and avoid running into walls or yourself.</p>
-                <span class="card-meta-stat" id="metaSnakeStat">Best: 0 pts</span>
+                <p>Walls or wrap-around, your pick.</p>
               </div>
-              <span class="btn-card-deploy">Play</span>
-            </div>
-          </div>
-
-          <!-- 3. Tic Tac Toe -->
-          <div class="game-card-wrapper">
-            <div class="game-card" data-game="tictactoe" role="button" tabindex="0">
-              <span class="card-badge">Quick</span>
-              <svg class="card-icon-svg"><use href="#icon-game-tictactoe"/></svg>
+              <span class="card-meta-stat" id="metaSnakeStat"></span>
+            </a>
+          </li>
+          <li>
+            <a class="game-card" href="#/game/tictactoe" data-game="tictactoe">
+              <svg class="card-icon-svg" aria-hidden="true"><use href="#icon-game-tictactoe"/></svg>
               <div class="game-card-content">
                 <h3>Tic Tac Toe</h3>
-                <p>Classic 3x3 grid against defensive bot logic.</p>
-                <span class="card-meta-stat" id="metaTttStat">Won: 0 / 0</span>
+                <p>Against the bot or a friend. The smart bot can only be drawn against.</p>
               </div>
-              <span class="btn-card-deploy">Play</span>
-            </div>
-          </div>
-
-          <!-- 4. Memory -->
-          <div class="game-card-wrapper">
-            <div class="game-card" data-game="memory" role="button" tabindex="0">
-              <span class="card-badge">Puzzle</span>
-              <svg class="card-icon-svg"><use href="#icon-game-memory"/></svg>
+              <span class="card-meta-stat" id="metaTttStat"></span>
+            </a>
+          </li>
+          <li>
+            <a class="game-card" href="#/game/memory" data-game="memory">
+              <svg class="card-icon-svg" aria-hidden="true"><use href="#icon-game-memory"/></svg>
               <div class="game-card-content">
-                <h3>Memory Match</h3>
-                <p>Find all 8 matching card pairs in minimum moves.</p>
-                <span class="card-meta-stat" id="metaMemoryStat">Best: --</span>
+                <h3>Memory</h3>
+                <p>Flip cards and find all 8 pairs.</p>
               </div>
-              <span class="btn-card-deploy">Play</span>
-            </div>
-          </div>
-
-          <!-- 5. Flappy -->
-          <div class="game-card-wrapper">
-            <div class="game-card" data-game="flappy" role="button" tabindex="0">
-              <span class="card-badge">Reflex</span>
-              <svg class="card-icon-svg"><use href="#icon-game-flappy"/></svg>
+              <span class="card-meta-stat" id="metaMemoryStat"></span>
+            </a>
+          </li>
+          <li>
+            <a class="game-card" href="#/game/flappy" data-game="flappy">
+              <svg class="card-icon-svg" aria-hidden="true"><use href="#icon-game-flappy"/></svg>
               <div class="game-card-content">
-                <h3>Flappy Bird</h3>
-                <p>Tap or press Space to hover through pipe gaps.</p>
-                <span class="card-meta-stat" id="metaFlappyStat">Best: 0</span>
+                <h3>Flappy</h3>
+                <p>Tap to flap through the gaps. Three speeds.</p>
               </div>
-              <span class="btn-card-deploy">Play</span>
-            </div>
-          </div>
-
-          <!-- 6. Breakout -->
-          <div class="game-card-wrapper">
-            <div class="game-card" data-game="breakout" role="button" tabindex="0">
-              <span class="card-badge">Arcade</span>
-              <svg class="card-icon-svg"><use href="#icon-game-breakout"/></svg>
+              <span class="card-meta-stat" id="metaFlappyStat"></span>
+            </a>
+          </li>
+          <li>
+            <a class="game-card" href="#/game/breakout" data-game="breakout">
+              <svg class="card-icon-svg" aria-hidden="true"><use href="#icon-game-breakout"/></svg>
               <div class="game-card-content">
                 <h3>Brick Breaker</h3>
-                <p>Bounce the ball and clear multi-hit brick rows.</p>
-                <span class="card-meta-stat" id="metaBreakoutStat">Best: 0 pts</span>
+                <p>Bounce the ball and break every brick before you run out of lives.</p>
               </div>
-              <span class="btn-card-deploy">Play</span>
-            </div>
-          </div>
-
-          <!-- 7. 2048 -->
-          <div class="game-card-wrapper">
-            <div class="game-card" data-game="twentyfortyeight" role="button" tabindex="0">
-              <span class="card-badge">Numbers</span>
-              <svg class="card-icon-svg"><use href="#icon-game-2048"/></svg>
+              <span class="card-meta-stat" id="metaBreakoutStat"></span>
+            </a>
+          </li>
+          <li>
+            <a class="game-card" href="#/game/twentyfortyeight" data-game="twentyfortyeight">
+              <svg class="card-icon-svg" aria-hidden="true"><use href="#icon-game-2048"/></svg>
               <div class="game-card-content">
                 <h3>2048</h3>
-                <p>Slide matching tiles to merge them into 2048.</p>
-                <span class="card-meta-stat" id="meta2048Stat">Best: 0 pts</span>
+                <p>Slide the tiles and merge equal numbers.</p>
               </div>
-              <span class="btn-card-deploy">Play</span>
-            </div>
-          </div>
-
-          <!-- 8. Minesweeper -->
-          <div class="game-card-wrapper">
-            <div class="game-card" data-game="minesweeper" role="button" tabindex="0">
-              <span class="card-badge">Logic</span>
-              <svg class="card-icon-svg"><use href="#icon-game-minesweeper"/></svg>
+              <span class="card-meta-stat" id="meta2048Stat"></span>
+            </a>
+          </li>
+          <li>
+            <a class="game-card" href="#/game/minesweeper" data-game="minesweeper">
+              <svg class="card-icon-svg" aria-hidden="true"><use href="#icon-game-minesweeper"/></svg>
               <div class="game-card-content">
                 <h3>Minesweeper</h3>
-                <p>9x9 field with 10 mines. Uncover safe cells and place flags.</p>
-                <span class="card-meta-stat" id="metaMinesweeperStat">Cleared: 0</span>
+                <p>9 by 9 grid with 10 mines hiding in it.</p>
               </div>
-              <span class="btn-card-deploy">Play</span>
-            </div>
-          </div>
-
-          <!-- 9. Whack-a-Mole -->
-          <div class="game-card-wrapper">
-            <div class="game-card" data-game="mole" role="button" tabindex="0">
-              <span class="card-badge">Casual</span>
-              <svg class="card-icon-svg"><use href="#icon-game-mole"/></svg>
+              <span class="card-meta-stat" id="metaMinesweeperStat"></span>
+            </a>
+          </li>
+          <li>
+            <a class="game-card" href="#/game/mole" data-game="mole">
+              <svg class="card-icon-svg" aria-hidden="true"><use href="#icon-game-mole"/></svg>
               <div class="game-card-content">
-                <h3>Whack a Mole</h3>
-                <p>Hit moles as soon as they pop up before 30 seconds are up.</p>
-                <span class="card-meta-stat" id="metaMoleStat">Best: 0 pts</span>
+                <h3>Whack-a-Mole</h3>
+                <p>You get 30 seconds. Hit as many as you can.</p>
               </div>
-              <span class="btn-card-deploy">Play</span>
-            </div>
-          </div>
-
-          <!-- 10. Connect 4 -->
-          <div class="game-card-wrapper">
-            <div class="game-card" data-game="connectfour" role="button" tabindex="0">
-              <span class="card-badge">Board</span>
-              <svg class="card-icon-svg"><use href="#icon-game-connectfour"/></svg>
+              <span class="card-meta-stat" id="metaMoleStat"></span>
+            </a>
+          </li>
+          <li>
+            <a class="game-card" href="#/game/connectfour" data-game="connectfour">
+              <svg class="card-icon-svg" aria-hidden="true"><use href="#icon-game-connectfour"/></svg>
               <div class="game-card-content">
                 <h3>Connect 4</h3>
-                <p>Vertical 7x6 board. Line up four colored discs in a row to win.</p>
-                <span class="card-meta-stat" id="metaC4Stat">Won: 0 / 0</span>
+                <p>Get four in a row before the bot does.</p>
               </div>
-              <span class="btn-card-deploy">Play</span>
-            </div>
-          </div>
-
-          <!-- 11. Word Guess -->
-          <div class="game-card-wrapper">
-            <div class="game-card" data-game="wordguess" role="button" tabindex="0">
-              <span class="card-badge">Word</span>
-              <svg class="card-icon-svg"><use href="#icon-game-wordguess"/></svg>
+              <span class="card-meta-stat" id="metaC4Stat"></span>
+            </a>
+          </li>
+          <li>
+            <a class="game-card" href="#/game/wordguess" data-game="wordguess">
+              <svg class="card-icon-svg" aria-hidden="true"><use href="#icon-game-wordguess"/></svg>
               <div class="game-card-content">
                 <h3>Word Guess</h3>
-                <p>Guess the hidden 5-letter word in 6 tries using color hints.</p>
-                <span class="card-meta-stat" id="metaWordStat">Solved: 0</span>
+                <p>Find the 5-letter word in six tries.</p>
               </div>
-              <span class="btn-card-deploy">Play</span>
-            </div>
-          </div>
-        </div>
+              <span class="card-meta-stat" id="metaWordStat"></span>
+            </a>
+          </li>
+        </ul>
       </section>
     </main>
 
-    <!-- Game Arena Overlay -->
-    <div id="viewArena" class="arena-overlay hidden" role="region">
+    <!-- the game itself is mounted in here -->
+    <div id="viewArena" class="arena-overlay hidden" role="region" aria-label="Game">
       <header class="arena-dock-top">
-        <button type="button" class="btn-nav-pill" id="btnArenaPause" aria-label="Pause Game">
-          <span>Pause</span>
+        <button type="button" class="btn-nav-pill" id="btnArenaPause" aria-label="Pause">
+          <svg class="btn-icon-svg" aria-hidden="true"><use href="#icon-pause"/></svg>
+          <span class="dock-btn-label">Pause</span>
         </button>
-        <div class="arena-title-wrap">
-          <h2 class="arena-game-title" id="arenaGameTitle">Game</h2>
-        </div>
-        <div class="arena-dock-actions">
-          <button type="button" class="btn-nav-pill" id="btnArenaForfeit" aria-label="Quit Game">
-            <span>Quit</span>
-          </button>
-        </div>
+        <h2 class="arena-game-title" id="arenaGameTitle">Game</h2>
+        <button type="button" class="btn-nav-pill" id="btnArenaQuit" aria-label="Quit game">
+          <svg class="btn-icon-svg" aria-hidden="true"><use href="#icon-quit"/></svg>
+          <span class="dock-btn-label">Quit</span>
+        </button>
       </header>
 
       <div class="arena-viewport-container" id="arenaViewport"></div>
     </div>
   </div>
 
-  <!-- Briefing Modal -->
-  <dialog id="dialogBriefing" class="console-dialog">
+  <!-- rules and options, shown before a game starts -->
+  <dialog id="dialogBriefing" class="sheet">
     <div class="dialog-card">
-      <div class="dialog-badge" id="briefingGameBadge">Rules & Setup</div>
-      <h2 id="briefingGameTitle">Game Rules</h2>
+      <h2 id="briefingGameTitle">How to play</h2>
       <ul class="briefing-bullet-list" id="briefingRulesList"></ul>
       <div id="briefingCustomOptions"></div>
       <div class="dialog-actions-row">
         <button type="button" class="btn-dialog-secondary" id="btnBriefingCancel">Back</button>
-        <button type="button" class="btn-dialog-primary" id="btnBriefingLaunch">Start Game</button>
+        <button type="button" class="btn-dialog-primary" id="btnBriefingLaunch">Start</button>
       </div>
     </div>
   </dialog>
 
-  <!-- Pause Modal -->
-  <dialog id="dialogPause" class="console-dialog">
+  <dialog id="dialogPause" class="sheet">
     <div class="dialog-card">
-      <div class="dialog-badge">Paused</div>
-      <h2>Game Paused</h2>
-      <p>Save your game to resume later, or keep playing now.</p>
+      <h2>Paused</h2>
+      <p id="pauseText">Take your time. The game is waiting.</p>
       <div class="dialog-actions-col">
         <button type="button" class="btn-dialog-primary" id="btnPauseResume">Resume</button>
-        <button type="button" class="btn-dialog-secondary" id="btnPauseSaveExit">Save & Exit</button>
+        <button type="button" class="btn-dialog-secondary" id="btnPauseSaveExit">Save and exit</button>
         <button type="button" class="btn-dialog-secondary" id="btnPauseRestart">Restart</button>
-        <button type="button" class="btn-dialog-danger" id="btnPauseForfeit">Quit Match</button>
+        <button type="button" class="btn-dialog-danger" id="btnPauseQuit">Quit game</button>
       </div>
     </div>
   </dialog>
 
-  <!-- Quit Confirm Modal -->
-  <dialog id="dialogConfirmForfeit" class="console-dialog">
+  <dialog id="dialogConfirmQuit" class="sheet">
     <div class="dialog-card">
-      <div class="dialog-badge" style="color:var(--status-loss);">Warning</div>
-      <h2>Leave this match?</h2>
-      <p>Quitting directly counts as a loss. To save without losing, pick <strong>Save & Exit</strong> from the pause menu.</p>
+      <h2>Quit this game?</h2>
+      <p id="confirmQuitText">Your progress in this round will be lost.</p>
       <div class="dialog-actions-row">
-        <button type="button" class="btn-dialog-secondary" id="btnForfeitCancel">Stay</button>
-        <button type="button" class="btn-dialog-danger" id="btnForfeitConfirm">Quit</button>
+        <button type="button" class="btn-dialog-secondary" id="btnQuitCancel">Keep playing</button>
+        <button type="button" class="btn-dialog-danger" id="btnQuitConfirm">Quit</button>
       </div>
     </div>
   </dialog>
 
-  <!-- Outcome Modal -->
-  <dialog id="dialogOutcome" class="console-dialog">
+  <dialog id="dialogOutcome" class="sheet">
     <div class="dialog-card">
-      <div class="dialog-badge" id="outcomeBadge">Results</div>
-      <h2 id="outcomeTitle">Match Finished</h2>
-      <p id="outcomeSubtitle" style="display:none;"></p>
-      <div id="outcomeDetails" style="margin-bottom:12px; font-weight:600;"></div>
+      <h2 id="outcomeTitle">Game over</h2>
+      <p id="outcomeSubtitle"></p>
       <div class="dialog-actions-row">
-        <button type="button" class="btn-dialog-primary" id="btnOutcomeReplay">Play Again</button>
-        <button type="button" class="btn-dialog-secondary" id="btnOutcomeLobby">Lobby</button>
+        <button type="button" class="btn-dialog-secondary" id="btnOutcomeLobby">Back to lobby</button>
+        <button type="button" class="btn-dialog-primary" id="btnOutcomeReplay">Play again</button>
       </div>
     </div>
   </dialog>
 
-  <!-- Profile Drawer -->
-  <aside id="profileDrawer" class="profile-drawer" role="dialog" aria-modal="true" aria-label="Player Profile">
+  <aside id="profileDrawer" class="profile-drawer" role="dialog" aria-modal="true" aria-label="Your profile">
     <div class="drawer-header">
-      <h3>Player Stats</h3>
-      <button type="button" class="btn-nav-pill" id="btnProfileDrawerClose" aria-label="Close Profile">✕</button>
+      <h3>Profile</h3>
+      <button type="button" class="btn-nav-pill" id="btnProfileDrawerClose" aria-label="Close profile">
+        <svg class="btn-icon-svg" aria-hidden="true"><use href="#icon-quit"/></svg>
+      </button>
     </div>
     <div class="drawer-body">
       <div class="drawer-user-card">
-        <div class="drawer-avatar-display user-avatar-pill" id="drawerAvatarDisplay">P1</div>
-        <div class="drawer-user-meta">
-          <h4 id="drawerCallsign">Player 1</h4>
-          <span style="font-size:0.75rem; color:var(--text-sub);">Local Profile</span>
-        </div>
-      </div>
-
-      <div class="drawer-xp-box">
-        <label for="inputCallsign" class="t-label">Edit Player Name:</label>
-        <input type="text" id="inputCallsign" maxlength="14" autocomplete="off" autocorrect="off" spellcheck="false" style="width:100%; padding:6px 8px; border:1px solid var(--border-line); border-radius:4px; background:var(--bg-panel); color:var(--text-main); margin-top:4px;">
+        <span class="avatar large" id="drawerAvatar">P</span>
+        <h4 id="drawerName">Player 1</h4>
       </div>
 
       <div>
-        <h4 style="font-size:0.85rem; font-weight:700; margin-bottom:8px;">Recent Matches</h4>
-        <div id="drawerLogsList" style="display:flex; flex-direction:column; gap:6px;"></div>
+        <label for="inputCallsign" class="field-label">Your name (up to 14 letters)</label>
+        <input type="text" id="inputCallsign" maxlength="14" autocomplete="off" autocorrect="off" spellcheck="false">
+      </div>
+
+      <div>
+        <span class="field-label">Avatar colour</span>
+        <div class="swatch-row" id="swatchRow"></div>
+      </div>
+
+      <div>
+        <h4 class="section-subhead">Your scores</h4>
+        <div class="stat-rows" id="statRows"></div>
+      </div>
+
+      <div>
+        <h4 class="section-subhead">Last few games</h4>
+        <div id="historyList"></div>
       </div>
     </div>
   </aside>

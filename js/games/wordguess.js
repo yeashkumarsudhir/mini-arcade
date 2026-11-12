@@ -1,13 +1,9 @@
-/**
- * js/games/wordguess.js
- * Word Guess — 5-Letter Tactile Wordle-Style Cabinet Game
- * Features: 6 attempts, virtual typewriter keypad, physical color flip, zero API dependencies
- */
+// wordguess.js: a Wordle-style game. Six tries, 5-letter words from a small built-in list.
 
 export default {
   id: 'wordguess',
   title: 'Word Guess',
-  accent: '#00e575',
+  accent: '#3fa66a',
 
   ctx: null,
   container: null,
@@ -31,50 +27,26 @@ export default {
 
     this.container.innerHTML = `
       <div class="arena-dual-layout">
-        <!-- 6x5 Letter Tiles Board -->
-        <div class="arena-board-frame" style="padding:14px; background:var(--bg-panel); border:2px solid var(--border-strong); border-radius:var(--radius-card); box-shadow:var(--shadow-offset-lg); display:flex; flex-direction:column; align-items:center; gap:12px;">
-          <div id="wordGrid" style="display:grid; grid-template-rows:repeat(6, 48px); gap:6px;">
+        <div class="arena-board-frame" style="padding:12px; flex-direction:column; gap:12px;">
+          <div id="wordGrid" style="display:grid; gap:6px; width:min(calc(100vw - 64px), 270px);">
             ${Array(6).fill(0).map((_, r) => `
-              <div class="word-row" data-row="${r}" style="display:grid; grid-template-columns:repeat(5, 48px); gap:6px;">
-                ${Array(5).fill(0).map((_, c) => `
-                  <div class="word-tile" data-col="${c}" style="width:48px; height:48px; border:2px solid var(--border-strong); border-radius:4px; display:flex; align-items:center; justify-content:center; font-family:'Archivo Black',sans-serif; font-size:1.3rem; font-weight:900; background:var(--bg-surface); color:var(--text-main); box-shadow:2px 2px 0 #000; text-transform:uppercase;"></div>
-                `).join('')}
+              <div class="word-row" data-row="${r}" style="display:grid; grid-template-columns:repeat(5, 1fr); gap:6px;">
+                ${Array(5).fill(0).map((_, c) => `<div class="word-tile" data-col="${c}"></div>`).join('')}
               </div>
             `).join('')}
           </div>
 
-          <!-- Typewriter Keypad -->
           <div id="wordKeypad" style="display:flex; flex-direction:column; gap:6px; max-width:360px; width:100%;"></div>
         </div>
 
-        <!-- Right Side Control Deck -->
         <div class="arena-side-controls">
-          <div class="telemetry-cell" style="text-align:center; padding:16px;">
-            <span class="t-label">Status</span>
-            <div id="wordStatus" class="t-val" style="font-size:1.2rem; color:var(--brand-accent); margin:4px 0;">
-              Guess 1 of 6
-            </div>
-            <div id="wordSubStatus" style="font-size:0.75rem; color:var(--text-dim); font-weight:600;">
-              Type a 5-letter word
-            </div>
+          <div class="stat-box" style="text-align:center;">
+            <div id="wordStatus" class="stat-value">Guess 1 of 6</div>
+            <div id="wordSubStatus" class="stat-label">Type a 5-letter word</div>
           </div>
 
-          <div class="telemetry-cell" style="padding:14px;">
-            <span class="t-label" style="text-align:center; margin-bottom:8px;">Legend</span>
-            <div style="display:flex; flex-direction:column; gap:6px; font-size:0.75rem;">
-              <div style="display:flex; align-items:center; gap:8px;">
-                <span style="display:inline-block; width:16px; height:16px; background:var(--status-win); border:1px solid #000; border-radius:3px;"></span>
-                <span>Correct spot</span>
-              </div>
-              <div style="display:flex; align-items:center; gap:8px;">
-                <span style="display:inline-block; width:16px; height:16px; background:var(--status-coin); border:1px solid #000; border-radius:3px;"></span>
-                <span>Wrong spot</span>
-              </div>
-              <div style="display:flex; align-items:center; gap:8px;">
-                <span style="display:inline-block; width:16px; height:16px; background:#2b3447; border:1px solid #000; border-radius:3px;"></span>
-                <span>Not in word</span>
-              </div>
-            </div>
+          <div class="stat-label" style="text-align:center;">
+            Green: right spot. Yellow: wrong spot. Grey: not in the word.
           </div>
         </div>
       </div>
@@ -101,14 +73,14 @@ export default {
     const rows = [
       ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
       ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
-      ['ENTER', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', '⌫']
+      ['ENTER', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', 'DEL']
     ];
 
     keypadEl.innerHTML = rows.map(r => `
       <div style="display:flex; justify-content:center; gap:4px;">
         ${r.map(k => `
-          <button type="button" class="btn-nav-pill word-key" data-key="${k}" style="height:38px; min-width:${k.length > 1 ? '44px' : '28px'}; padding:0 4px; justify-content:center; font-size:0.75rem; font-weight:800; border-color:var(--border-strong);">
-            ${k}
+          <button type="button" class="btn-nav-pill word-key" data-key="${k}" style="height:40px; min-width:${k.length > 1 ? '46px' : '28px'}; padding:0 4px; font-size:0.8rem;">
+            ${k === 'ENTER' ? 'Enter' : k === 'DEL' ? 'Del' : k}
           </button>
         `).join('')}
       </div>
@@ -117,7 +89,7 @@ export default {
 
   setupListeners() {
     this.keyHandler = (e) => {
-      if (this.isGameOver) return;
+      if (this.isGameOver || document.querySelector('dialog[open]')) return;
       const k = e.key.toUpperCase();
 
       if (k === 'ENTER') this.handleEnter();
@@ -133,7 +105,7 @@ export default {
 
       const k = btn.getAttribute('data-key');
       if (k === 'ENTER') this.handleEnter();
-      else if (k === '⌫') this.handleBackspace();
+      else if (k === 'DEL') this.handleBackspace();
       else this.handleLetter(k);
     });
   },
@@ -179,7 +151,7 @@ export default {
     const guessArr = guess.split('');
     const status = Array(5).fill('absent');
 
-    // First pass: exact matches (Green)
+    // first pass: letters in the right place
     for (let i = 0; i < 5; i++) {
       if (guessArr[i] === targetArr[i]) {
         status[i] = 'correct';
@@ -187,7 +159,7 @@ export default {
       }
     }
 
-    // Second pass: misplaced matches (Yellow)
+    // second pass: right letter, wrong place (each letter is used only once)
     for (let i = 0; i < 5; i++) {
       if (status[i] !== 'correct') {
         const foundIdx = targetArr.indexOf(guessArr[i]);
@@ -198,59 +170,41 @@ export default {
       }
     }
 
-    // Color tiles and keypad keys
+    // a key keeps its best colour: correct beats present beats absent
+    const rank = { absent: 1, present: 2, correct: 3 };
+
     tiles.forEach((tile, i) => {
-      setTimeout(() => {
+      this.ctx.scheduler.after(i * 90, () => {
         const st = status[i];
-        let bg = '#2b3447';
-        if (st === 'correct') bg = 'var(--status-win)';
-        else if (st === 'present') bg = 'var(--status-coin)';
-
-        tile.style.background = bg;
-        tile.style.borderColor = '#000000';
-        if (st === 'present') tile.style.color = '#000000';
-
+        tile.classList.add(st);
         this.ctx.fx.playTone(st === 'correct' ? 660 : 440, 'triangle', 0.03, 0.08);
 
-        // Update keyboard button color
         const keyBtn = document.querySelector(`.word-key[data-key="${guessArr[i]}"]`);
-        if (keyBtn && !keyBtn.classList.contains('key-correct')) {
-          if (st === 'correct') {
-            keyBtn.classList.add('key-correct');
-            keyBtn.style.background = 'var(--status-win)';
-            keyBtn.style.color = '#ffffff';
-          } else if (st === 'present') {
-            keyBtn.style.background = 'var(--status-coin)';
-            keyBtn.style.color = '#000000';
-          } else {
-            keyBtn.style.background = '#2b3447';
-            keyBtn.style.color = 'var(--text-dim)';
-          }
+        if (keyBtn && (rank[keyBtn.dataset.state] || 0) < rank[st]) {
+          keyBtn.classList.remove('absent', 'present', 'correct');
+          keyBtn.classList.add(st);
+          keyBtn.dataset.state = st;
         }
-      }, i * 90);
+      });
     });
 
-    setTimeout(() => {
+    this.ctx.scheduler.after(550, () => {
       if (guess === this.targetWord) {
         this.isGameOver = true;
-        this.ctx.fx.sfx.victory();
         this.ctx.recordResult('WIN', {
           score: Math.max(10, (7 - this.guesses.length) * 20),
-          summary: `Guessed ${this.targetWord} in ${this.guesses.length}/6!`,
-          ranked: true
+          summary: `You got ${this.targetWord} in ${this.guesses.length} of 6.`
         });
       } else if (this.guesses.length >= this.maxGuesses) {
         this.isGameOver = true;
-        this.ctx.fx.sfx.defeat();
         this.ctx.recordResult('LOSS', {
           score: 0,
-          summary: `Word was: ${this.targetWord}`,
-          ranked: true
+          summary: `The word was ${this.targetWord}.`
         });
       } else {
         this.updateStatus();
       }
-    }, 550);
+    });
   },
 
   renderCurrentRow() {
@@ -261,21 +215,18 @@ export default {
     const tiles = rowEl.querySelectorAll('.word-tile');
     tiles.forEach((tile, i) => {
       tile.textContent = this.currentGuess[i] || '';
-      tile.style.borderColor = this.currentGuess[i] ? 'var(--brand-accent)' : 'var(--border-strong)';
+      tile.classList.toggle('filled', !!this.currentGuess[i]);
     });
   },
 
   resetBoardVisuals() {
     document.querySelectorAll('.word-tile').forEach(tile => {
       tile.textContent = '';
-      tile.style.background = 'var(--bg-surface)';
-      tile.style.borderColor = 'var(--border-strong)';
-      tile.style.color = 'var(--text-main)';
+      tile.className = 'word-tile';
     });
     document.querySelectorAll('.word-key').forEach(k => {
-      k.style.background = '';
-      k.style.color = '';
-      k.classList.remove('key-correct');
+      k.classList.remove('absent', 'present', 'correct');
+      delete k.dataset.state;
     });
   },
 

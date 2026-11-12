@@ -1,9 +1,13 @@
+// ludo-render.js: draws the board and the pawns on a canvas. The static board is drawn once
+// into a cache and copied every frame.
+
 import {
   LUDO_PALETTE,
   LUDO_CONFIG,
   TRACK_COORDINATES,
   HOME_COLUMNS,
   YARD_WELL_COORDINATES,
+  CENTER_GOAL_COORDINATES,
   LudoRules
 } from './ludo-rules.js';
 
@@ -12,13 +16,14 @@ export class LudoRenderer {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.offscreenBoard = null;
+    this.paperPattern = null;
 
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.boardSize = 540;
     this.cellSize = 36;
-    this.colorBlindMode = false;
 
-    this.renderStaticBoard();
+    this.colorBlindMode = false;
+    this.initOffscreenSurfaces();
   }
 
   setColorBlind(enabled) {
@@ -26,7 +31,7 @@ export class LudoRenderer {
   }
 
   resize(displaySize) {
-    const size = Math.max(300, Math.min(Math.floor(displaySize), 540));
+    const size = Math.floor(displaySize);
     this.boardSize = size;
     this.cellSize = size / 15;
 
@@ -38,10 +43,45 @@ export class LudoRenderer {
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.scale(this.dpr, this.dpr);
 
-    this.renderStaticBoard();
+    this.renderStaticBoardToCache();
   }
 
-  renderStaticBoard() {
+  initOffscreenSurfaces() {
+    this.createPaperTexture();
+    this.renderStaticBoardToCache();
+  }
+
+  createPaperTexture() {
+    const texCanvas = document.createElement('canvas');
+    texCanvas.width = 128;
+    texCanvas.height = 128;
+    const tCtx = texCanvas.getContext('2d');
+
+    tCtx.fillStyle = LUDO_PALETTE.PAPER;
+    tCtx.fillRect(0, 0, 128, 128);
+
+    const imgData = tCtx.getImageData(0, 0, 128, 128);
+    const data = imgData.data;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const noise = (Math.random() - 0.5) * 6;
+      data[i] = Math.min(255, Math.max(0, data[i] + noise));
+      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + noise));
+      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + noise));
+    }
+    tCtx.putImageData(imgData, 0, 0);
+
+    tCtx.fillStyle = 'rgba(43, 43, 43, 0.025)';
+    for (let j = 0; j < 25; j++) {
+      const x = Math.random() * 128;
+      const y = Math.random() * 128;
+      tCtx.fillRect(x, y, 1.5, 1.5);
+    }
+
+    this.paperPattern = this.ctx.createPattern(texCanvas, 'repeat');
+  }
+
+  renderStaticBoardToCache() {
     this.offscreenBoard = document.createElement('canvas');
     this.offscreenBoard.width = Math.floor(this.boardSize * this.dpr);
     this.offscreenBoard.height = Math.floor(this.boardSize * this.dpr);
@@ -52,29 +92,38 @@ export class LudoRenderer {
     const s = this.boardSize;
     const c = this.cellSize;
 
-    // Outer frame
-    bCtx.fillStyle = '#2b1d16';
+    // outer frame
+    bCtx.fillStyle = LUDO_PALETTE.FRAME;
     bCtx.beginPath();
-    bCtx.roundRect(0, 0, s, s, 6);
+    bCtx.roundRect(0, 0, s, s, 12);
     bCtx.fill();
 
-    // Inner board
-    const inset = 4;
+    bCtx.strokeStyle = '#16233b';
+    bCtx.lineWidth = 2;
+    bCtx.strokeRect(1, 1, s - 2, s - 2);
+
+    // Paper playing field
+    const inset = 6;
     bCtx.save();
     bCtx.beginPath();
-    bCtx.roundRect(inset, inset, s - inset * 2, s - inset * 2, 4);
+    bCtx.roundRect(inset, inset, s - inset * 2, s - inset * 2, 8);
     bCtx.clip();
 
-    bCtx.fillStyle = '#fffdf7';
-    bCtx.fillRect(0, 0, s, s);
+    if (this.paperPattern) {
+      bCtx.fillStyle = this.paperPattern;
+      bCtx.fillRect(0, 0, s, s);
+    } else {
+      bCtx.fillStyle = LUDO_PALETTE.PAPER;
+      bCtx.fillRect(0, 0, s, s);
+    }
 
-    // 4 Corner yards
+    // 4 Corner Yards
     this.drawYard(bCtx, 0, 0, LUDO_PALETTE.RED, 'RED');
     this.drawYard(bCtx, 9, 0, LUDO_PALETTE.GREEN, 'GREEN');
     this.drawYard(bCtx, 9, 9, LUDO_PALETTE.YELLOW, 'YELLOW');
     this.drawYard(bCtx, 0, 9, LUDO_PALETTE.BLUE, 'BLUE');
 
-    // Outer track cells
+    // Outer Track Cells
     for (let i = 0; i < LUDO_CONFIG.TRACK_LENGTH; i++) {
       const [col, row] = TRACK_COORDINATES[i];
       const x = col * c;
@@ -91,29 +140,29 @@ export class LudoRenderer {
       } else if (i === 26) {
         bCtx.fillStyle = LUDO_PALETTE.YELLOW;
         bCtx.fillRect(x, y, c, c);
-        this.drawStartArrow(bCtx, x, y, c, 'LEFT', '#222222');
+        this.drawStartArrow(bCtx, x, y, c, 'LEFT', '#2B2B2B');
       } else if (i === 39) {
         bCtx.fillStyle = LUDO_PALETTE.BLUE;
         bCtx.fillRect(x, y, c, c);
         this.drawStartArrow(bCtx, x, y, c, 'UP', '#ffffff');
       }
 
-      bCtx.strokeStyle = '#222222';
+      bCtx.strokeStyle = LUDO_PALETTE.INK;
       bCtx.lineWidth = 1;
       bCtx.strokeRect(x, y, c, c);
 
       if (LUDO_CONFIG.SAFE_SQUARES.includes(i) && ![0, 13, 26, 39].includes(i)) {
-        this.drawStar(bCtx, x + c / 2, y + c / 2, c * 0.32, 'rgba(40, 40, 40, 0.7)');
+        this.drawStar(bCtx, x + c / 2, y + c / 2, c * 0.32, 'rgba(43, 43, 43, 0.75)');
       }
     }
 
-    // Home runways
+    // Home Runways
     this.drawHomeRunway(bCtx, HOME_COLUMNS.RED, LUDO_PALETTE.RED);
     this.drawHomeRunway(bCtx, HOME_COLUMNS.GREEN, LUDO_PALETTE.GREEN);
     this.drawHomeRunway(bCtx, HOME_COLUMNS.YELLOW, LUDO_PALETTE.YELLOW);
     this.drawHomeRunway(bCtx, HOME_COLUMNS.BLUE, LUDO_PALETTE.BLUE);
 
-    // Center triangles
+    // Center Triangles
     this.drawCenterGoal(bCtx, c);
 
     bCtx.restore();
@@ -128,34 +177,40 @@ export class LudoRenderer {
     ctx.fillStyle = colorHex;
     ctx.fillRect(x, y, size, size);
 
-    ctx.strokeStyle = '#222222';
+    ctx.strokeStyle = LUDO_PALETTE.INK;
     ctx.lineWidth = 1.5;
     ctx.strokeRect(x, y, size, size);
 
     const pad = c * 0.8;
     ctx.fillStyle = '#FFFFFF';
     ctx.beginPath();
-    ctx.roundRect(x + pad, y + pad, size - pad * 2, size - pad * 2, 6);
+    ctx.roundRect(x + pad, y + pad, size - pad * 2, size - pad * 2, 10);
     ctx.fill();
-    ctx.strokeStyle = '#222222';
+    ctx.strokeStyle = '#2B2B2B';
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
     const wells = YARD_WELL_COORDINATES[colorKey];
     wells.forEach(([wx, wy]) => {
-      const cx = wx * c;
-      const cy = wy * c;
-      const r = c * 0.38;
+      // the well coordinates are cell numbers, pawns are drawn in the middle of their cell
+      const cx = wx * c + c / 2;
+      const cy = wy * c + c / 2;
+      const r = c * 0.4;
 
       ctx.beginPath();
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.fillStyle = colorHex;
-      ctx.globalAlpha = 0.25;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
       ctx.fill();
-      ctx.globalAlpha = 1.0;
-      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.25)';
       ctx.lineWidth = 1.5;
       ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 0.7, 0, Math.PI * 2);
+      ctx.fillStyle = colorHex;
+      ctx.globalAlpha = 0.35;
+      ctx.fill();
+      ctx.globalAlpha = 1.0;
     });
   }
 
@@ -164,9 +219,11 @@ export class LudoRenderer {
     columnCoords.forEach(([col, row]) => {
       const x = col * c;
       const y = row * c;
+
       ctx.fillStyle = colorHex;
       ctx.fillRect(x, y, c, c);
-      ctx.strokeStyle = '#222222';
+
+      ctx.strokeStyle = LUDO_PALETTE.INK;
       ctx.lineWidth = 1;
       ctx.strokeRect(x, y, c, c);
     });
@@ -176,34 +233,54 @@ export class LudoRenderer {
     const cx = 7.5 * c;
     const cy = 7.5 * c;
 
-    const triangles = [
-      { coords: [[6 * c, 6 * c], [cx, cy], [6 * c, 9 * c]], color: LUDO_PALETTE.RED },
-      { coords: [[6 * c, 6 * c], [cx, cy], [9 * c, 6 * c]], color: LUDO_PALETTE.GREEN },
-      { coords: [[9 * c, 6 * c], [cx, cy], [9 * c, 9 * c]], color: LUDO_PALETTE.YELLOW },
-      { coords: [[6 * c, 9 * c], [cx, cy], [9 * c, 9 * c]], color: LUDO_PALETTE.BLUE }
-    ];
+    // RED Left
+    ctx.beginPath();
+    ctx.moveTo(6 * c, 6 * c);
+    ctx.lineTo(cx, cy);
+    ctx.lineTo(6 * c, 9 * c);
+    ctx.fillStyle = LUDO_PALETTE.RED;
+    ctx.fill();
 
-    triangles.forEach(t => {
-      ctx.beginPath();
-      ctx.moveTo(t.coords[0][0], t.coords[0][1]);
-      ctx.lineTo(t.coords[1][0], t.coords[1][1]);
-      ctx.lineTo(t.coords[2][0], t.coords[2][1]);
-      ctx.fillStyle = t.color;
-      ctx.fill();
-    });
+    // GREEN Top
+    ctx.beginPath();
+    ctx.moveTo(6 * c, 6 * c);
+    ctx.lineTo(cx, cy);
+    ctx.lineTo(9 * c, 6 * c);
+    ctx.fillStyle = LUDO_PALETTE.GREEN;
+    ctx.fill();
 
-    ctx.strokeStyle = '#ffffff';
+    // YELLOW Right
+    ctx.beginPath();
+    ctx.moveTo(9 * c, 6 * c);
+    ctx.lineTo(cx, cy);
+    ctx.lineTo(9 * c, 9 * c);
+    ctx.fillStyle = LUDO_PALETTE.YELLOW;
+    ctx.fill();
+
+    // BLUE Bottom
+    ctx.beginPath();
+    ctx.moveTo(6 * c, 9 * c);
+    ctx.lineTo(cx, cy);
+    ctx.lineTo(9 * c, 9 * c);
+    ctx.fillStyle = LUDO_PALETTE.BLUE;
+    ctx.fill();
+
+    // Clean white partition lines
+    ctx.strokeStyle = '#FFFFFF';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(6 * c, 6 * c); ctx.lineTo(9 * c, 9 * c);
-    ctx.moveTo(6 * c, 9 * c); ctx.lineTo(9 * c, 6 * c);
+    ctx.moveTo(6 * c, 6 * c);
+    ctx.lineTo(9 * c, 9 * c);
+    ctx.moveTo(6 * c, 9 * c);
+    ctx.lineTo(9 * c, 6 * c);
     ctx.stroke();
 
+    // Center circular badge
     ctx.beginPath();
-    ctx.arc(cx, cy, c * 0.4, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff';
+    ctx.arc(cx, cy, c * 0.42, 0, Math.PI * 2);
+    ctx.fillStyle = LUDO_PALETTE.PAPER;
     ctx.fill();
-    ctx.strokeStyle = '#222222';
+    ctx.strokeStyle = LUDO_PALETTE.INK;
     ctx.lineWidth = 1.5;
     ctx.stroke();
   }
@@ -220,15 +297,16 @@ export class LudoRenderer {
 
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.moveTo(-c * 0.22, -c * 0.12);
-    ctx.lineTo(c * 0.05, -c * 0.12);
-    ctx.lineTo(c * 0.05, -c * 0.25);
-    ctx.lineTo(c * 0.3, 0);
-    ctx.lineTo(c * 0.05, c * 0.25);
-    ctx.lineTo(c * 0.05, c * 0.12);
-    ctx.lineTo(-c * 0.22, c * 0.12);
+    ctx.moveTo(-c * 0.25, -c * 0.15);
+    ctx.lineTo(c * 0.05, -c * 0.15);
+    ctx.lineTo(c * 0.05, -c * 0.28);
+    ctx.lineTo(c * 0.32, 0);
+    ctx.lineTo(c * 0.05, c * 0.28);
+    ctx.lineTo(c * 0.05, c * 0.15);
+    ctx.lineTo(-c * 0.25, c * 0.15);
     ctx.closePath();
     ctx.fill();
+
     ctx.restore();
   }
 
@@ -258,7 +336,8 @@ export class LudoRenderer {
       legalMoves = [],
       animatingHop = null,
       selectedToken = null,
-      hoverPreviewCell = null
+      hoverPreviewCell = null,
+      effects = []
     } = options;
 
     const ctx = this.ctx;
@@ -269,11 +348,13 @@ export class LudoRenderer {
       ctx.drawImage(this.offscreenBoard, 0, 0, this.boardSize, this.boardSize);
     }
 
+    this.drawYardTurnIndicator(activeColor);
+
     if (hoverPreviewCell) {
       const [hx, hy] = hoverPreviewCell;
       ctx.save();
       ctx.strokeStyle = LUDO_PALETTE[activeColor];
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2.5;
       ctx.strokeRect(hx * c + 2, hy * c + 2, c - 4, c - 4);
       ctx.restore();
     }
@@ -298,6 +379,7 @@ export class LudoRenderer {
         cellMap.get(key).push({
           color: col,
           tokenIndex: idx,
+          progress: prog,
           gx,
           gy,
           isLegal: (col === activeColor && legalMoves.includes(idx)),
@@ -313,6 +395,28 @@ export class LudoRenderer {
     if (animatingHop) {
       this.drawHoppingPawn(animatingHop);
     }
+
+    this.drawParticleEffects(effects);
+  }
+
+  drawYardTurnIndicator(activeColor) {
+    const c = this.cellSize;
+    const yardOrigins = {
+      RED: [0, 0],
+      GREEN: [9, 0],
+      YELLOW: [9, 9],
+      BLUE: [0, 9]
+    };
+    const [col, row] = yardOrigins[activeColor] || [0, 0];
+    const x = col * c;
+    const y = row * c;
+    const size = 6 * c;
+
+    this.ctx.save();
+    this.ctx.strokeStyle = '#000000';
+    this.ctx.lineWidth = 3;
+    this.ctx.strokeRect(x + 1.5, y + 1.5, size - 3, size - 3);
+    this.ctx.restore();
   }
 
   drawPawnGroup(pawns) {
@@ -327,18 +431,43 @@ export class LudoRenderer {
       return;
     }
 
+    const allSameColor = pawns.every(p => p.color === pawns[0].color);
+    if (allSameColor) {
+      const col = pawns[0].color;
+      const baseGx = pawns[0].gx;
+      const baseGy = pawns[0].gy;
+      const cx = baseGx * c + c / 2;
+      const cy = baseGy * c + c / 2;
+
+      const scale = 0.78;
+      const offsets = [
+        { dx: -5, dy: -4 },
+        { dx: 4, dy: -4 },
+        { dx: -4, dy: 4 },
+        { dx: 4, dy: 4 }
+      ];
+
+      pawns.forEach((p, i) => {
+        const off = offsets[i % offsets.length];
+        this.drawPawn(cx + off.dx, cy + off.dy, col, scale, p.isLegal, p.isSelected, p.tokenIndex);
+      });
+
+      this.drawStackBadge(cx + c * 0.32, cy - c * 0.32, count, LUDO_PALETTE[col]);
+      return;
+    }
+
     const quadrants = [
-      { dx: -c * 0.2, dy: -c * 0.2 },
-      { dx: c * 0.2, dy: -c * 0.2 },
-      { dx: -c * 0.2, dy: c * 0.2 },
-      { dx: c * 0.2, dy: c * 0.2 }
+      { dx: -c * 0.22, dy: -c * 0.22 },
+      { dx: c * 0.22, dy: -c * 0.22 },
+      { dx: -c * 0.22, dy: c * 0.22 },
+      { dx: c * 0.22, dy: c * 0.22 }
     ];
 
     pawns.forEach((p, idx) => {
       const q = quadrants[idx % quadrants.length];
       const cx = p.gx * c + c / 2 + q.dx;
       const cy = p.gy * c + c / 2 + q.dy;
-      this.drawPawn(cx, cy, p.color, 0.72, p.isLegal, p.isSelected, p.tokenIndex);
+      this.drawPawn(cx, cy, p.color, 0.74, p.isLegal, p.isSelected, p.tokenIndex);
     });
   }
 
@@ -353,51 +482,97 @@ export class LudoRenderer {
     if (isLegal) {
       liftY = isSelected ? -4 : -2;
 
+      // Solid flat highlight ring (no blur)
       ctx.beginPath();
-      ctx.arc(0, 0, 14 * scale + 2, 0, Math.PI * 2);
-      ctx.strokeStyle = '#222222';
+      ctx.arc(0, 0, 15 * scale + 3, 0, Math.PI * 2);
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(0, 0, 15 * scale + 1, 0, Math.PI * 2);
+      ctx.strokeStyle = '#FFFFFF';
       ctx.lineWidth = 1.5;
       ctx.stroke();
     }
 
-    // Shadow
+    // Contact shadow
     ctx.beginPath();
-    ctx.ellipse(0, 6 * scale, 10 * scale, 4 * scale, 0, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+    ctx.ellipse(0, 6 * scale, 12 * scale, 5 * scale, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
     ctx.fill();
 
     ctx.translate(0, liftY);
 
-    // Pawn Body
+    // Conic body
     ctx.beginPath();
-    ctx.moveTo(-8 * scale, 4 * scale);
-    ctx.quadraticCurveTo(-6 * scale, -3 * scale, -3 * scale, -6 * scale);
-    ctx.lineTo(3 * scale, -6 * scale);
-    ctx.quadraticCurveTo(6 * scale, -3 * scale, 8 * scale, 4 * scale);
+    ctx.moveTo(-9 * scale, 4 * scale);
+    ctx.quadraticCurveTo(-7 * scale, -4 * scale, -4 * scale, -7 * scale);
+    ctx.lineTo(4 * scale, -7 * scale);
+    ctx.quadraticCurveTo(7 * scale, -4 * scale, 9 * scale, 4 * scale);
     ctx.closePath();
     ctx.fillStyle = baseColor;
     ctx.fill();
-    ctx.strokeStyle = '#1a1a1a';
-    ctx.lineWidth = 1.5 * scale;
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1.8 * scale;
     ctx.stroke();
 
-    // Pawn Head
-    const headRadius = 5.5 * scale;
-    const headY = -11 * scale;
+    // Collar
+    ctx.beginPath();
+    ctx.ellipse(0, -7 * scale, 5.5 * scale, 2 * scale, 0, 0, Math.PI * 2);
+    ctx.fillStyle = this.shadeColor(baseColor, 15);
+    ctx.fill();
+    ctx.stroke();
+
+    // Head
+    const headRadius = 6.2 * scale;
+    const headY = -13 * scale;
     ctx.beginPath();
     ctx.arc(0, headY, headRadius, 0, Math.PI * 2);
     ctx.fillStyle = baseColor;
     ctx.fill();
     ctx.stroke();
 
+    // Specular dot
+    ctx.beginPath();
+    ctx.arc(-2 * scale, headY - 2 * scale, 1.6 * scale, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fill();
+
     if (this.colorBlindMode) {
-      ctx.fillStyle = '#ffffff';
-      ctx.font = `bold ${Math.round(7 * scale)}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(`${tokenIndex + 1}`, 0, headY);
+      this.drawColorBlindMark(ctx, 0, headY, tokenIndex, scale);
     }
 
+    ctx.restore();
+  }
+
+  drawColorBlindMark(ctx, x, y, tokenIndex, scale) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = `bold ${Math.round(7 * scale)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${tokenIndex + 1}`, 0, 0.5);
+    ctx.restore();
+  }
+
+  drawStackBadge(x, y, count, bgColor) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, 8, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fill();
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.fillStyle = '#1A1A1A';
+    ctx.font = 'bold 9px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${count}`, x, y + 0.5);
     ctx.restore();
   }
 
@@ -413,17 +588,64 @@ export class LudoRenderer {
     const floorX = startX + (endX - startX) * progress;
     const floorY = startY + (endY - startY) * progress;
 
-    const maxHeight = 14;
+    const maxHeight = 16;
     const arcHeight = 4 * maxHeight * progress * (1 - progress);
+
+    const pawnX = floorX;
     const pawnY = floorY - arcHeight;
+
+    const shadowScale = 1.0 - (arcHeight / maxHeight) * 0.4;
 
     this.ctx.save();
     this.ctx.beginPath();
-    this.ctx.ellipse(floorX, floorY + 4, 10, 4, 0, 0, Math.PI * 2);
-    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    this.ctx.ellipse(floorX, floorY + 6, 12 * shadowScale, 5 * shadowScale, 0, 0, Math.PI * 2);
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
     this.ctx.fill();
     this.ctx.restore();
 
-    this.drawPawn(floorX, pawnY, color, 1.05, true, false, tokenIndex);
+    this.drawPawn(pawnX, pawnY, color, 1.05, true, false, tokenIndex);
+  }
+
+  drawParticleEffects(effects) {
+    if (!effects || effects.length === 0) return;
+    const ctx = this.ctx;
+
+    effects.forEach(fx => {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, fx.life);
+
+      if (fx.type === 'ring') {
+        ctx.beginPath();
+        ctx.arc(fx.x, fx.y, fx.radius, 0, Math.PI * 2);
+        ctx.strokeStyle = fx.color || '#000000';
+        ctx.lineWidth = fx.lineWidth || 2;
+        ctx.stroke();
+      } else if (fx.type === 'spark') {
+        ctx.beginPath();
+        ctx.arc(fx.x, fx.y, fx.size, 0, Math.PI * 2);
+        ctx.fillStyle = fx.color || '#FFFFFF';
+        ctx.fill();
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    });
+  }
+
+  shadeColor(color, percent) {
+    let num = parseInt(color.replace('#', ''), 16);
+    let amt = Math.round(2.55 * percent);
+    let R = (num >> 16) + amt;
+    let B = ((num >> 8) & 0x00FF) + amt;
+    let G = (num & 0x0000FF) + amt;
+
+    return '#' + (
+      0x1000000 +
+      (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
+      (B < 255 ? (B < 1 ? 0 : B) : 255) * 0x100 +
+      (G < 255 ? (G < 1 ? 0 : G) : 255)
+    ).toString(16).slice(1);
   }
 }

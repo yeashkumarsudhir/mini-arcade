@@ -1,10 +1,11 @@
+// loop.js: game loop with a fixed 60 updates per second. Drawing runs at the screen speed.
 export class GameLoop {
   constructor({ onUpdate, onRender }) {
     this.onUpdate = onUpdate;
     this.onRender = onRender;
 
-    this.fixedStep = 1000 / 60;
-    this.maxAccumulated = 100;
+    this.fixedStep = 1000 / 60; // 16.666ms per update
+    this.maxAccumulated = 100;  // Clamps spike lag to 100ms
     this.accumulator = 0;
     this.lastTime = 0;
     this.rafId = null;

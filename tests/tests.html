@@ -2,229 +2,36 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Mini Arcade — Test Suite</title>
+  <title>Mini Arcade tests</title>
   <style>
-    :root {
-      --bg: #0e1117;
-      --card-bg: #161b22;
-      --border: #30363d;
-      --pass: #2ea043;
-      --fail: #f85149;
-      --text: #e6edf3;
-      --sub: #8b949e;
-      --accent: #2f81f7;
-    }
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
-      padding: 24px;
-      line-height: 1.5;
-      max-width: 800px;
-      margin: 0 auto;
-    }
-    h1 {
-      font-size: 1.3rem;
-      color: var(--accent);
-      margin-bottom: 20px;
-    }
-    .test-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 8px 12px;
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      margin-bottom: 6px;
-      font-size: 0.85rem;
-    }
-    .pass {
-      color: var(--pass);
-      font-weight: 700;
-    }
-    .fail {
-      color: var(--fail);
-      font-weight: 700;
-    }
-    #summary {
-      margin-top: 24px;
-      padding: 14px;
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      font-size: 0.9rem;
-    }
+    body { font-family: system-ui, sans-serif; padding: 24px; max-width: 760px; margin: 0 auto; color: #16233b; }
+    h1 { margin-bottom: 12px; }
+    .row { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; border-bottom: 1px solid #dce6f1; font-size: 0.92rem; }
+    .pass { color: #2c7a4b; font-weight: 700; }
+    .fail { color: #c23b3b; font-weight: 700; }
+    #summary { margin: 16px 0; padding: 12px; border: 1.5px solid #22304a; border-radius: 6px; font-weight: 700; }
   </style>
 </head>
 <body>
-  <h1>Mini Arcade Test Runner</h1>
+  <h1>Mini Arcade tests</h1>
+  <p>Open this page through a local server (modules do not load from file://), for example <code>python -m http.server</code>.</p>
+  <div id="summary">Running...</div>
   <div id="results"></div>
-  <div id="summary">Running tests...</div>
 
   <script type="module">
-    import { LudoRules, LUDO_CONFIG } from '../js/games/ludo-rules.js';
-    import { Scheduler } from '../js/core/scheduler.js';
-    import { GameLoop } from '../js/core/loop.js';
-    import { Storage } from '../js/core/storage.js';
-    import { Analytics } from '../js/analytics.js';
-    import TttGame from '../js/games/tictactoe.js';
+    import { runLudoTests } from './ludo-rules.test.js';
 
-    const testResults = [];
+    const results = runLudoTests();
+    const failed = results.filter(r => !r.pass);
 
-    function assert(name, condition) {
-      testResults.push({ name, pass: !!condition });
-    }
+    document.getElementById('summary').textContent =
+      failed.length === 0 ? `All ${results.length} tests passed` : `${failed.length} of ${results.length} tests failed`;
 
-    async function runAcceptanceTests() {
-      // 1. Ludo: Nest requires 6, cannot overshoot past 56
-      const stateYard = {
-        tokens: {
-          RED: [-1, -1, -1, -1],
-          GREEN: [-1, -1, -1, -1],
-          YELLOW: [-1, -1, -1, -1],
-          BLUE: [-1, -1, -1, -1]
-        }
-      };
-      const nestLegalMovesWithout6 = LudoRules.getLegalMoves(stateYard, 'RED', 4);
-      assert('Ludo: Yard pawn cannot leave on non-6 roll', nestLegalMovesWithout6.length === 0);
-
-      const nestLegalMovesWith6 = LudoRules.getLegalMoves(stateYard, 'RED', 6);
-      assert('Ludo: Yard pawn mobilizes on roll of 6', nestLegalMovesWith6.length === 4);
-
-      const stateNearEnd = {
-        tokens: {
-          RED: [54, 56, 56, 56],
-          GREEN: [-1, -1, -1, -1],
-          YELLOW: [-1, -1, -1, -1],
-          BLUE: [-1, -1, -1, -1]
-        }
-      };
-      const overshootLegal = LudoRules.getLegalMoves(stateNearEnd, 'RED', 4);
-      assert('Ludo: No overshoot permitted past step 56', overshootLegal.length === 0);
-
-      const exactLegal = LudoRules.getLegalMoves(stateNearEnd, 'RED', 2);
-      assert('Ludo: Exact roll enters Home target', exactLegal.length === 1 && exactLegal[0] === 0);
-
-      // 2. Track Integrity: 52 Unique track indices, correct starts, and 8 verified safe stars
-      assert('Track Integrity: 52 outer track segments', LUDO_CONFIG.TRACK_LENGTH === 52);
-      assert('Track Integrity: Star indices [0, 8, 13, 21, 26, 34, 39, 47]',
-        JSON.stringify(LUDO_CONFIG.SAFE_SQUARES) === JSON.stringify([0, 8, 13, 21, 26, 34, 39, 47])
-      );
-      assert('Track Integrity: Starts RED=0, GREEN=13, YELLOW=26, BLUE=39',
-        LUDO_CONFIG.STARTS.RED === 0 &&
-        LUDO_CONFIG.STARTS.GREEN === 13 &&
-        LUDO_CONFIG.STARTS.YELLOW === 26 &&
-        LUDO_CONFIG.STARTS.BLUE === 39
-      );
-
-      // 3. Captures blocked on safe squares
-      const stateSafeCheck = {
-        tokens: {
-          RED: [0, -1, -1, -1],
-          BLUE: [39, -1, -1, -1],
-          GREEN: [-1, -1, -1, -1],
-          YELLOW: [-1, -1, -1, -1]
-        }
-      };
-      const safeCaptureCheck = LudoRules.checkCapture(stateSafeCheck, 'BLUE', 13);
-      assert('Ludo: Star safe zones prevent opponent captures', safeCaptureCheck === null);
-
-      // 4. Scheduler pause and resume accuracy
-      const scheduler = new Scheduler();
-      let timerFired = false;
-      scheduler.after(100, () => { timerFired = true; });
-      scheduler.pause();
-      await new Promise(r => setTimeout(r, 120));
-      assert('Scheduler: Paused timer remains frozen past duration', timerFired === false);
-      scheduler.resume();
-      await new Promise(r => setTimeout(r, 120));
-      assert('Scheduler: Resumed timer executes remaining time correctly', timerFired === true);
-      scheduler.dispose();
-
-      // 5. Fixed-Timestep Accumulator Simulation Loop
-      let updateTicks = 0;
-      const testLoop = new GameLoop({
-        onUpdate: () => { updateTicks++; },
-        onRender: () => {}
-      });
-      testLoop.start();
-      await new Promise(r => setTimeout(r, 100));
-      testLoop.stop();
-      assert('GameLoop: Fixed accumulator loop executes consistently', updateTicks >= 4 && updateTicks <= 8);
-
-      // 6. Tic Tac Toe Minimax AI
-      function isAiUnbeatable(board, isX) {
-        const win = TttGame.checkWin(board);
-        if (win) return win.winner !== 'X';
-        if (TttGame.isBoardFull(board)) return true;
-
-        if (isX) {
-          for (let i = 0; i < 9; i++) {
-            if (board[i] === null) {
-              board[i] = 'X';
-              const safe = isAiUnbeatable(board, false);
-              board[i] = null;
-              if (!safe) return false;
-            }
-          }
-          return true;
-        } else {
-          let bestScore = -Infinity;
-          let bestMove = -1;
-          for (let i = 0; i < 9; i++) {
-            if (board[i] === null) {
-              board[i] = 'O';
-              const score = TttGame.minimax(board, 0, false);
-              board[i] = null;
-              if (score > bestScore) {
-                bestScore = score;
-                bestMove = i;
-              }
-            }
-          }
-          board[bestMove] = 'O';
-          const safe = isAiUnbeatable(board, true);
-          board[bestMove] = null;
-          return safe;
-        }
-      }
-      const aiUnbeatable = isAiUnbeatable(Array(9).fill(null), true);
-      assert('Tic Tac Toe: Hard Minimax AI never loses', aiUnbeatable === true);
-
-      // 7. Analytics: Match tracking and score logging
-      Analytics.init();
-      const prevMatches = Analytics.data.matches;
-      Analytics.record({ game: 'ludo', outcome: 'WIN' });
-      assert('Analytics: Wins and matches increment correctly', Analytics.data.matches === prevMatches + 1);
-
-      // 8. Storage Safe Engine & Name Sanitization
-      const sampleScript = ['<', 'script', '>alert(1)<', '/script', '>'].join('');
-      Storage.setItem('__mini_arcade_probe__', sampleScript);
-      assert('SafeStorage: Writes and retrieves strings safely', Storage.getItem('__mini_arcade_probe__') === sampleScript);
-
-      Analytics.setCallsign('TestPlayer123456789');
-      assert('Analytics: Player name is clamped to 14 characters', Analytics.data.callsign.length <= 14);
-
-      // Render Test UI Results
-      const container = document.getElementById('results');
-      container.innerHTML = testResults.map(t => `
-        <div class="test-row">
-          <span>${t.name}</span>
-          <span class="${t.pass ? 'pass' : 'fail'}">${t.pass ? 'PASS' : 'FAIL'}</span>
-        </div>
-      `).join('');
-
-      const passCount = testResults.filter(t => t.pass).length;
-      document.getElementById('summary').innerHTML = `
-        <strong>Total Tests:</strong> ${testResults.length} |
-        <span class="pass">Passed: ${passCount}</span> |
-        <span class="${passCount === testResults.length ? 'pass' : 'fail'}">
-          ${passCount === testResults.length ? 'All tests passed' : 'Failures detected'}
-        </span>
-      `;
-    }
-
-    runAcceptanceTests();
+    // failures first, so they are the first thing you see
+    const rows = [...failed, ...results.filter(r => r.pass)];
+    document.getElementById('results').innerHTML = rows.map(r => `
+      <div class="row"><span>${r.name}</span><span class="${r.pass ? 'pass' : 'fail'}">${r.pass ? 'pass' : 'FAIL'}</span></div>
+    `).join('');
   </script>
 </body>
 </html>

@@ -1,7 +1,10 @@
+// twentyfortyeight.js: 2048 on a 4 by 4 board. Arrow keys, WASD or swipe.
+import { Stats } from '../stats.js';
+
 export default {
   id: 'twentyfortyeight',
   title: '2048',
-  accent: '#d29922',
+  accent: '#f2b705',
 
   ctx: null,
   container: null,
@@ -19,22 +22,19 @@ export default {
 
     this.container.innerHTML = `
       <div class="arena-dual-layout">
-        <div class="arena-board-frame" style="padding:10px; background:var(--bg-panel); border:1px solid var(--border-line); border-radius:8px;">
-          <div id="grid2048" style="display:grid; grid-template-columns:repeat(4, 1fr); grid-template-rows:repeat(4, 1fr); gap:6px; width:min(calc(100vw - 48px), 320px); aspect-ratio:1; touch-action:none; background:var(--bg-base); padding:6px; border-radius:6px; border:1px solid var(--border-line);"></div>
+        <div class="arena-board-frame" style="padding:12px;">
+          <div id="grid2048" style="display:grid; grid-template-columns:repeat(4, 1fr); grid-template-rows:repeat(4, 1fr); gap:8px; width:min(calc(100vw - 64px), 340px); aspect-ratio:1; touch-action:none; background:var(--bg-base); padding:8px; border-radius:6px; border:1.5px solid var(--border-line);"></div>
         </div>
 
         <div class="arena-side-controls">
-          <div class="telemetry-cell" style="text-align:center; padding:12px;">
-            <span class="t-label">Score</span>
-            <div id="score2048" class="t-val" style="font-size:2rem; color:var(--status-coin); margin:2px 0;">0</div>
-            <div id="best2048" style="font-size:0.75rem; color:var(--text-dim);">Best: 0</div>
+          <div class="stat-box" style="text-align:center; padding:14px;">
+            <span class="stat-label">Score</span>
+            <div id="score2048" class="stat-value" style="font-size:2.4rem;">0</div>
+            <div id="best2048" class="stat-label">Best: 0</div>
           </div>
 
-          <div class="telemetry-cell" style="padding:10px; text-align:center;">
-            <span class="t-label">How to play</span>
-            <p style="font-size:0.75rem; color:var(--text-sub); margin-top:4px; line-height:1.4;">
-              Swipe or use Arrow keys / WASD to slide matching numbers together. Combine them until you reach 2048.
-            </p>
+          <div class="stat-label" style="text-align:center;">
+            Swipe, or use the arrow keys or WASD. Make a 2048 tile to win.
           </div>
         </div>
       </div>
@@ -57,10 +57,7 @@ export default {
   },
 
   loadBestScore() {
-    try {
-      const saved = localStorage.getItem('parlour_2048_best');
-      this.bestScore = saved ? parseInt(saved, 10) : 0;
-    } catch {}
+    this.bestScore = Stats.get('twentyfortyeight').best;
   },
 
   spawnTile() {
@@ -90,6 +87,7 @@ export default {
     };
     window.addEventListener('keydown', this.keyHandler);
 
+    // Touch Swipe Support
     let startX = 0, startY = 0;
     const boardEl = document.getElementById('grid2048');
 
@@ -157,19 +155,17 @@ export default {
   },
 
   handlePostMove() {
-    this.ctx.fx.playTone(420, 'triangle', 0.03, 0.08);
+    this.ctx.fx.playTone(420, 'triangle', 0.03, 0.1);
     this.spawnTile();
     this.renderBoard();
     this.updateStats();
 
     if (this.hasWon) {
-      this.ctx.fx.sfx.victory();
-      this.ctx.recordResult('WIN', { score: this.score, summary: `Reached 2048! (Score: ${this.score})` });
+      this.ctx.recordResult('WIN', { score: this.score, summary: `You made 2048 with a score of ${this.score}.` });
       this.hasWon = false;
     } else if (this.checkGameOver()) {
       this.isGameOver = true;
-      this.ctx.fx.sfx.defeat();
-      this.ctx.recordResult('LOSS', { score: this.score, summary: `No moves left (Score: ${this.score})` });
+      this.ctx.recordResult('LOSS', { score: this.score, summary: `No moves left. You scored ${this.score}.` });
     }
   },
 
@@ -190,26 +186,26 @@ export default {
 
     const colorMap = {
       0: { bg: 'var(--bg-surface)', fg: 'transparent' },
-      2: { bg: '#21262d', fg: 'var(--text-main)' },
-      4: { bg: '#30363d', fg: 'var(--text-main)' },
-      8: { bg: '#8c5b00', fg: '#ffffff' },
-      16: { bg: '#a35200', fg: '#ffffff' },
-      32: { bg: '#b3261e', fg: '#ffffff' },
-      64: { bg: '#cf222e', fg: '#ffffff' },
-      128: { bg: '#1a7f37', fg: '#ffffff' },
-      256: { bg: '#0969da', fg: '#ffffff' },
-      512: { bg: '#2f81f7', fg: '#ffffff' },
-      1024: { bg: '#8250df', fg: '#ffffff' },
-      2048: { bg: '#d29922', fg: '#000000' }
+      2: { bg: '#eef2f9', fg: '#16233b' },
+      4: { bg: '#dde6f5', fg: '#16233b' },
+      8: { bg: '#f7c948', fg: '#16233b' },
+      16: { bg: '#f0a04b', fg: '#16233b' },
+      32: { bg: '#e8714f', fg: '#ffffff' },
+      64: { bg: '#d8504e', fg: '#ffffff' },
+      128: { bg: '#8fc79e', fg: '#16233b' },
+      256: { bg: '#3fa66a', fg: '#ffffff' },
+      512: { bg: '#5b83e8', fg: '#ffffff' },
+      1024: { bg: '#3d63e0', fg: '#ffffff' },
+      2048: { bg: '#f2b705', fg: '#16233b' }
     };
 
     el.innerHTML = this.board.flat().map(val => {
-      const palette = colorMap[val] || { bg: '#8250df', fg: '#ffffff' };
+      const palette = colorMap[val] || { bg: '#22304a', fg: '#ffffff' };
       const displayVal = val === 0 ? '' : val;
-      const fontSize = val >= 1000 ? '1.1rem' : '1.3rem';
+      const fontSize = val >= 1000 ? '1.25rem' : '1.5rem';
 
       return `
-        <div style="background:${palette.bg}; color:${palette.fg}; display:flex; align-items:center; justify-content:center; font-size:${fontSize}; font-weight:700; border-radius:4px; border:1px solid var(--border-line); user-select:none;">
+        <div style="background:${palette.bg}; color:${palette.fg}; display:flex; align-items:center; justify-content:center; font-family:var(--font-hand); font-size:${fontSize}; font-weight:700; border-radius:6px; border:1.5px solid var(--border-strong); user-select:none;">
           ${displayVal}
         </div>
       `;
@@ -223,7 +219,7 @@ export default {
 
     if (this.score > this.bestScore) {
       this.bestScore = this.score;
-      localStorage.setItem('parlour_2048_best', this.bestScore);
+      Stats.noteBest('twentyfortyeight', this.bestScore);
     }
     if (bEl) bEl.textContent = `Best: ${this.bestScore}`;
   },

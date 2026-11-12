@@ -1,3 +1,4 @@
+// bus.js: tiny event emitter so modules can talk without importing each other.
 export class EventBus {
   constructor() {
     this.listeners = new Map();
