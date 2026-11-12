@@ -53,7 +53,7 @@ export default {
           </div>
 
           <div class="stat-label" style="text-align:center;">
-            Desktop par right-click se seedha flag lag jata hai.
+            Right-click on desktop to place a flag directly.
           </div>
         </div>
       </div>
@@ -98,7 +98,7 @@ export default {
       const r = Math.floor(Math.random() * this.rows);
       const c = Math.floor(Math.random() * this.cols);
 
-      // Pehle click aur uske aas-paas mine nahi lagayenge
+      // Avoid placing mines on the first click or its surrounding squares
       const isSafeZone = Math.abs(r - safeR) <= 1 && Math.abs(c - safeC) <= 1;
       if (!this.board[r][c].isMine && !isSafeZone) {
         this.board[r][c].isMine = true;
@@ -106,7 +106,7 @@ export default {
       }
     }
 
-    // Number of surrounding mines calculate karein
+    // Calculate the number of surrounding mines for each cell
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         if (this.board[r][c].isMine) continue;
@@ -242,7 +242,7 @@ export default {
     this.isGameOver = true;
     if (this.timerInterval) clearInterval(this.timerInterval);
 
-    // Sabhi mines show karein
+    // Reveal all mines on game over
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         if (this.board[r][c].isMine) {

@@ -180,14 +180,14 @@ export const ArcadeApp = {
     const totals = Stats.totals();
     intro.textContent = '';
     if (totals.plays === 0) {
-      intro.append(`Hi ${data.name}, pehle ek `);
+      intro.append(`Hi ${data.name}, up for a game of `);
       const mark = document.createElement('mark');
       mark.textContent = 'Ludo';
-      intro.append(mark, ' ho jaye?');
+      intro.append(mark, ' first?');
     } else {
-      intro.append(`Hi ${data.name}. ${totals.plays === 1 ? '1 game khela' : totals.plays + ' games khele'}, `);
+      intro.append(`Hi ${data.name}. ${totals.plays === 1 ? '1 game played' : totals.plays + ' games played'}, `);
       const mark = document.createElement('mark');
-      mark.textContent = `${totals.wins} jeete`;
+      mark.textContent = `${totals.wins} won`;
       intro.append(mark, '.');
     }
 
@@ -464,16 +464,16 @@ export const ArcadeApp = {
     const title = document.getElementById('outcomeTitle');
     title.className = '';
     if (outcome === 'WIN') {
-      title.textContent = 'Jeet gaye!';
+      title.textContent = 'You won!';
       title.classList.add('win');
       FXEngine.sfx.victory();
     } else if (outcome === 'DRAW') {
-      title.textContent = 'Barabar raha';
+      title.textContent = 'It is a draw';
     } else if (game && !game.vsOpponent) {
       title.textContent = 'Game over';
       FXEngine.sfx.defeat();
     } else {
-      title.textContent = 'Haar gaye';
+      title.textContent = 'You lost';
       title.classList.add('loss');
       FXEngine.sfx.defeat();
     }
@@ -672,7 +672,7 @@ export const ArcadeApp = {
     if (Stats.data.history.length === 0) {
       const note = document.createElement('p');
       note.className = 'empty-note';
-      note.textContent = 'Abhi koi match nahi khela.';
+      note.textContent = 'No matches played yet.';
       list.append(note);
     }
     for (const item of Stats.data.history) {
